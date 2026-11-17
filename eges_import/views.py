@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponseForbidden, QueryDict
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, QueryDict
 from django.core import signing
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
@@ -1140,7 +1140,7 @@ def _form_estadisticas_fuentes(data):
     return form
 
 
-def _datos_estadisticas_fuentes(request):
+def _datos_estadisticas_fuentes(request, *, detalle_director=False):
     datos = request.GET.copy()
     dashboard_completo = datos.get('base_eges') == 'todos'
     if dashboard_completo:
@@ -1162,6 +1162,7 @@ def _datos_estadisticas_fuentes(request):
             fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, modalidades=modalidades,
             agrupacion=request.GET.get('agrupacion', 'mes'),
             dashboard_global=True, incluir_netterm=request.GET.get('incluir_netterm') == '1',
+            detalle_director=detalle_director,
         )
         resultado['metadatos']['periodo_inferido_netterm'] = False
         return resultado
@@ -1262,6 +1263,10 @@ def _imagen_grafico_estadistico(labels, datasets, *, tipo='bar', horizontal=Fals
 @user_passes_test(es_superuser, login_url='/admin/')
 @require_GET
 def exportar_pdf_fuentes(request):
+    return _exportar_pdf_fuentes(request)
+
+
+def _exportar_pdf_fuentes(request):
     """Exporta los mismos agregados y filtros del tablero EGES + Netterm."""
     import io
     from html import escape
@@ -2207,17 +2212,40 @@ def portal_director(request, token):
         )
 
     # Métricas globales rápidas para el contexto inicial
-    total_estudios = _base_estudios_finalizados().count()
     fecha_min_row = EgesRow.objects.filter(fecha_turno__isnull=False).order_by('fecha_turno').first()
     fecha_max_row = EgesRow.objects.filter(fecha_turno__isnull=False).order_by('-fecha_turno').first()
 
     return render(request, 'eges_import/portal_director.html', {
         'token': str(director_token.token),
         'etiqueta': director_token.nombre_etiqueta,
-        'total_estudios': total_estudios,
+        'hay_aportes_netterm': ProduccionValidada.objects.exists(),
+        'fecha_referencia': max(filter(None, [
+            fecha_max_row.fecha_turno if fecha_max_row else None,
+            ProduccionValidada.objects.aggregate(ultima=Max('fecha_hasta'))['ultima'],
+        ]), default=None),
         'fecha_min': fecha_min_row.fecha_turno if fecha_min_row else None,
         'fecha_max': fecha_max_row.fecha_turno if fecha_max_row else None,
     })
+
+
+def _request_produccion_director(request):
+    from copy import copy
+    consulta = copy(request)
+    consulta.GET = request.GET.copy()
+    consulta.GET['base_eges'] = 'todos'
+    consulta.GET.setdefault('incluir_netterm', '1')
+    return consulta
+
+
+@require_GET
+def portal_director_fuentes(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    try:
+        datos = _datos_estadisticas_fuentes(_request_produccion_director(request), detalle_director=True)
+        return JsonResponse(datos)
+    except ValidationError as error:
+        return JsonResponse({'error': ' '.join(error.messages)}, status=400)
 
 
 def portal_director_kpis(request, token):
@@ -2307,7 +2335,45 @@ def portal_director_hallazgos(request, token):
 def portal_director_exportar_excel(request, token):
     if not _verificar_token(token):
         return HttpResponseForbidden()
-    return _exportar_excel(request)
+    import io
+    import openpyxl
+    try:
+        datos = _datos_estadisticas_fuentes(_request_produccion_director(request), detalle_director=True)
+    except ValidationError as error:
+        return HttpResponse(' '.join(error.messages), status=400, content_type='text/plain; charset=utf-8')
+    libro = openpyxl.Workbook()
+    resumen = libro.active
+    resumen.title = 'Resumen'
+    resumen.append(['Indicador', 'Valor'])
+    for etiqueta, clave in [('Prácticas realizadas', 'practicas_realizadas'),
+                           ('Pacientes identificados', 'pacientes_atendidos'),
+                           ('Prácticas por paciente identificado', 'practicas_por_paciente')]:
+        resumen.append([etiqueta, datos['kpis'][clave]])
+    resumen.append(['Fuente', datos['metadatos']['fuente']])
+    resumen.append(['Desde', str(datos['metadatos']['fecha_desde'] or '')])
+    resumen.append(['Hasta', str(datos['metadatos']['fecha_hasta'] or '')])
+    for titulo, grafico in [('Evolución', datos['temporal']), ('Modalidades', datos['modalidad']),
+                            ('Médicos', datos['medicos']), ('Coberturas', datos['obras_sociales']),
+                            ('Prácticas', datos['director']['practicas'])]:
+        hoja = libro.create_sheet(titulo)
+        hoja.append(['Categoría'] + [serie['label'] for serie in grafico['datasets']])
+        for indice, etiqueta in enumerate(grafico['labels']):
+            # Las etiquetas se escriben como texto incluso si comienzan por '='.
+            hoja.append([etiqueta] + [serie['data'][indice] for serie in grafico['datasets']])
+            hoja.cell(hoja.max_row, 1).data_type = 's'
+        if grafico.get('resto') or grafico.get('sin_dato'):
+            resto = libro.create_sheet(titulo + ' resto')
+            resto.append(['Categoría', 'Prácticas'])
+            for item in grafico.get('resto', []):
+                resto.append([item['nombre'], item['total']])
+                resto.cell(resto.max_row, 1).data_type = 's'
+            if grafico.get('sin_dato'):
+                resto.append(['Sin dato', grafico['sin_dato']])
+    buffer = io.BytesIO()
+    libro.save(buffer)
+    respuesta = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    respuesta['Content-Disposition'] = 'attachment; filename="produccion_servicio.xlsx"'
+    return respuesta
 
 
 def portal_director_franja_horaria(request, token):
@@ -2811,4 +2877,4 @@ def exportar_pdf(request):
 def portal_director_exportar_pdf(request, token):
     if not _verificar_token(token):
         return HttpResponseForbidden()
-    return _exportar_pdf(request)
+    return _exportar_pdf_fuentes(_request_produccion_director(request))

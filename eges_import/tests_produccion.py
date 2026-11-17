@@ -117,6 +117,18 @@ class FuentesSinteticasMixin:
 
 
 class ProduccionFuentesTest(FuentesSinteticasMixin, TestCase):
+    def test_contexto_actual_evitar_cargar_filas_originales_completas(self):
+        self.eges()
+        fila = self.netterm()
+        normalizados = {**fila.normalizados_json, 'cobertura': 'COBERTURA ACTUAL'}
+        NettermFila.objects.filter(pk=fila.pk).update(normalizados_json=normalizados)
+        with CaptureQueriesContext(connection) as consultas:
+            datos = construir_estadisticas_fuentes(batch_eges_ids=[self.batch.pk],
+                                                   lote_netterm_ids=[self.lote.pk])
+        self.assertEqual(datos['kpis']['practicas_realizadas'], 1)
+        self.assertIn('COBERTURA ACTUAL', datos['obras_sociales']['labels'])
+        self.assertFalse(any('originales_json' in consulta['sql'] for consulta in consultas))
+
     def test_top_diez_medicos_y_coberturas_conservan_totales_en_detalle(self):
         for indice in range(12):
             self.eges(dni_paciente=str(10000000 + indice), medico_informante=f'MEDICO PRUEBA {indice}',

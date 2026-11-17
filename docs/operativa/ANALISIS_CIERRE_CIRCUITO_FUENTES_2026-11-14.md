@@ -701,3 +701,84 @@ En esa lectura la memoria residente pasó aproximadamente de 204 a 296 MiB.
 Es una observación local cuya magnitud requiere contrastar en Heroku. Pasaron
 47 pruebas focales y se verificaron la lectura Linux y su fallo controlado.
 La instrumentación queda local, pendiente de publicación.
+
+## Pendiente para retomar tras restablecer el cupo
+
+El usuario publicó la instrumentación del commit ca726bf1 y ejecutó consultas.
+En Heroku, TC y ECO de agosto a octubre con Netterm respondió HTTP 200 en
+14,02 segundos. Las etapas marcaron producción 6,33 s, lectura_contexto 3,81 s,
+identidades 0,78 s, médicos 0,013 s, coberturas 2,59 s y filas e indicadores 0,37 s.
+La memoria residente del proceso pasó de 199 a unos 462 MiB. La lectura_contexto
+pasó de 327 a 449 MiB. Una consulta posterior de TC y ECO sin aporte Netterm
+respondió en 22,34 s y coincidió con nuevos avisos R14. Los procesos comparten
+el límite del dyno, por lo que las muestras por proceso requieren correlación
+con el consumo total. Estas cifras no prueban por sí solas una fuga de memoria.
+
+El siguiente trabajo es reducir el costo de preparar producción y la lectura
+de fuentes. Revisar especialmente la carga de originales_json completos para
+recuperar cobertura y los campos históricos necesarios para equivalencias.
+Conservar la identificación y la unificación de nombres, comparar respuestas
+completas en local y medir memoria y tiempos antes de publicar.
+El portal del director y la integración de Liquidación siguen pendientes.
+El usuario pidió detener el trabajo hasta que se restablezca su límite de uso.
+
+## Portal del director, 17 de noviembre
+
+El usuario priorizó el portal del director para su presentación del día siguiente.
+Se conserva la pantalla ejecutiva y sus vistas de evolución, guardias documentadas,
+días, modalidades, subtipos ECO, profesionales, coberturas, procedimientos y Doppler.
+La nueva ruta protegida por token fuentes-data reúne la respuesta de estadísticas
+del tablero y sus desgloses ejecutivos en una consulta compartida por el navegador.
+Los gráficos de detalle consumen la misma población conciliada. El contexto de
+guardia usa tipo_atencion EGES o sector Guardia explícito Netterm.
+
+Las tarjetas muestran prácticas realizadas, pacientes identificados, promedio por
+día y prácticas por paciente identificado. Médicos y coberturas utilizan nombres
+unificados y muestran el resto del ranking como detalle. La consulta inicial usa
+TC y ECO de los tres meses hasta el último período disponible. «Todas» mantiene
+el acceso al resto de modalidades. El aporte Netterm aprobado está activado
+inicialmente cuando existe una confirmación y puede desactivarse. El estado de
+la consulta muestra fuente, aporte e identidades pendientes, con avisos de revisión.
+
+El PDF del director comparte el generador del tablero de fuentes y sus filtros.
+La exportación Excel del director contiene resúmenes agregados de la misma fuente.
+Los enlaces token mantienen control de vigencia y la pantalla ofrece lectura.
+Las rutas antiguas por gráfico continúan disponibles para sus consumidores
+anteriores. El nuevo portal consulta exclusivamente la respuesta conjunta.
+
+Pasaron 332 pruebas, incluidas cinco nuevas de igualdad entre portal y tablero,
+aporte opcional, filtros, token inactivo, PDF y Excel. La prueba JavaScript verificó
+que las solicitudes de tarjetas y gráficos comparten una petición. La plantilla
+y JavaScript compilan y git diff --check pasó. No se realizaron cambios en la
+base habitual ni despliegues. Los cambios están locales, pendientes de prueba
+visual del usuario y publicación. La reducción adicional de memoria sigue pendiente.
+
+## Reducción de memoria del contexto, 17 de noviembre
+
+Antes de publicar el portal, el usuario priorizó optimizar memoria y conservar las
+funcionalidades existentes. El ajuste está concentrado en _poblacion. EGES se
+lee como filas de campos seleccionados con iteración por lotes. Netterm conserva
+en memoria únicamente los nueve campos usados por identidad, médicos, coberturas
+y hora. Los originales completos se leen en lotes sólo para observaciones cuya
+cobertura normalizada está ausente, conservando la regla histórica de 37 columnas.
+
+Una comparación con copia en memoria de la base habitual verificó respuestas
+completas idénticas, incluidos los detalles del director, con y sin Netterm.
+En esas ejecuciones, sólo EGES pasó de 4,38 a 3,81 segundos y con Netterm de 7,55
+a 6,56 segundos. En una medición aislada de _poblacion con producción ya preparada,
+tracemalloc marcó un pico de asignaciones Python de 121,92 MiB antes y 19,23 MiB
+después. Estas cifras corresponden a esa etapa local y excluyen la memoria del
+resto del proceso y del dyno. El impacto en Heroku requiere medir tras publicación.
+
+El botón Actualizar del director y los controles del dashboard conservan su
+comportamiento en este ajuste. Se añadió una regresión que comprueba que la
+consulta de fuentes con cobertura normalizada omite originales_json. Las pruebas
+existentes verifican la recuperación desde libros antiguos. Los cambios quedan
+locales junto con la adaptación del director, pendientes de prueba y publicación.
+
+Verificación final. Pasaron 333 pruebas de eges_import, respaldo de fuentes y cruce
+de Liquidación. Se estabilizó la prueba de reenvío de Netterm para reutilizar los
+mismos bytes del libro en ambos intentos. Antes generaba un XLSX nuevo en cada
+intento, cuyo contenido binario puede variar por las fechas internas del archivo.
+El control de reimportación sigue verificando el mismo archivo. git diff --check
+pasó. La prueba visual y la medición posterior en Heroku siguen pendientes.

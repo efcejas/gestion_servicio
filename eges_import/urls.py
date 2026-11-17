@@ -45,6 +45,7 @@ urlpatterns = [
 
     # ── Portal del Director (acceso por token, sin login) ────────────────────
     path('director/<str:token>/', views.portal_director, name='portal_director'),
+    path('director/<str:token>/fuentes-data/', views.portal_director_fuentes, name='portal_director_fuentes'),
     path('director/<str:token>/kpis/', views.portal_director_kpis, name='portal_director_kpis'),
     path('director/<str:token>/analisis-temporal/', views.portal_director_analisis_temporal, name='portal_director_analisis_temporal'),
     path('director/<str:token>/distribucion/', views.portal_director_distribucion, name='portal_director_distribucion'),

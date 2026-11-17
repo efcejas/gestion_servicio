@@ -245,8 +245,10 @@ class PreviewNettermViewTest(TestCase):
 
     def test_carga_unica_guarda_muestra_resumen_y_reenvio_es_idempotente(self):
         self.client.force_login(self.superuser)
+        contenido = _archivo_netterm().read()
         for intento in range(2):
-            response = self.client.post(self.url, {'archivo': _archivo_netterm(), 'accion': 'cargar'})
+            archivo = SimpleUploadedFile('netterm.xlsx', contenido)
+            response = self.client.post(self.url, {'archivo': archivo, 'accion': 'cargar'})
             self.assertEqual(response.status_code, 200)
             self.assertIsNotNone(response.context['lote_guardado'])
             self.assertEqual(response.context['lote_creado'], intento == 0)

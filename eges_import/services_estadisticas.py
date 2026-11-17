@@ -144,20 +144,31 @@ def _poblacion(seleccion, modalidades, produccion_dashboard=None, filas_anterior
     eges_ids = {item['fila']['id'] for item in practicas if 'fecha_turno' in item['fila']}
     netterm_ids = {item.get('netterm', item['fila'])['id'] for item in practicas
                    if item.get('netterm') or 'fecha_pedido' in item['fila']}
-    eges = {fila.pk: fila for fila in EgesRow.objects.filter(pk__in=eges_ids).only(
+    eges = {fila.pk: fila for fila in EgesRow.objects.filter(pk__in=eges_ids).values_list(
         'pk', 'medico_informante', 'sub_modalidad', 'obra_social', 'codigo_obra_social',
-        'dni_paciente', 'apellido_nombre',
-    )}
+        'dni_paciente', 'apellido_nombre', 'tipo_atencion',
+        named=True,
+    ).iterator(chunk_size=500)}
     netterm = {}
-    for origen in NettermFila.objects.filter(pk__in=netterm_ids).only('normalizados_json', 'originales_json'):
-        datos = dict(origen.normalizados_json)
-        # Los lotes anteriores conservan cobertura en su fila original de 37 columnas.
-        if not datos.get('cobertura') and isinstance(origen.originales_json, list) and len(origen.originales_json) == 37:
-            cobertura = origen.originales_json[13]
+    campos_netterm = ('informante', 'obra_social', 'cobertura', 'documento', 'tipo_documento',
+                      'paciente', 'historia_clinica', 'hora_realizacion', 'sector')
+    sin_cobertura = []
+    for pk, normalizados in NettermFila.objects.filter(pk__in=netterm_ids).values_list(
+        'pk', 'normalizados_json',
+    ).iterator(chunk_size=128):
+        datos = {campo: normalizados.get(campo) for campo in campos_netterm}
+        if not datos.get('cobertura'):
+            sin_cobertura.append(pk)
+        netterm[pk] = datos
+    # Sólo los lotes antiguos necesitan recuperar cobertura del libro original.
+    for pk, originales in NettermFila.objects.filter(pk__in=sin_cobertura).values_list(
+        'pk', 'originales_json',
+    ).iterator(chunk_size=128):
+        if isinstance(originales, list) and len(originales) == 37:
+            cobertura = originales[13]
             if isinstance(cobertura, dict):
                 cobertura = cobertura.get('valor')
-            datos['cobertura'] = str(cobertura or '').strip()
-        netterm[origen.pk] = datos
+            netterm[pk]['cobertura'] = str(cobertura or '').strip()
     if medicion:
         medicion.marcar('lectura_contexto')
     identidades_netterm = _identidades_netterm(eges, netterm)
@@ -231,6 +242,10 @@ def _poblacion(seleccion, modalidades, produccion_dashboard=None, filas_anterior
             'obra_social': cobertura, 'cobertura_original': cobertura_original or SIN_DATO,
             'revision_cobertura': coberturas['pendientes'].get(clave_nt) if not original else None,
             'practica': fila['practica'],
+            'codigo': fila['codigo'],
+            'procedimiento_guiado': bool(item.get('procedimiento_guiado')),
+            'guardia': ((original.tipo_atencion or '').strip().upper() == 'GUARDIA' if original
+                        else str(nt.get('sector', '')).strip().upper() == 'GUARDIA'),
         }
         # Las unidades comparten los mismos datos de lectura para los gráficos.
         destino = (filas_anteriores if filas_anteriores is not None and desde
@@ -273,7 +288,7 @@ def _metrica(actual, anterior):
 
 def construir_estadisticas_fuentes(*, batch_eges_ids, lote_netterm_ids, fecha_desde=None,
                                    fecha_hasta=None, modalidades=None, agrupacion='mes', validacion_id=None,
-                                   dashboard_global=False, incluir_netterm=False):
+                                   dashboard_global=False, incluir_netterm=False, detalle_director=False):
     if not batch_eges_ids and not lote_netterm_ids:
         raise ValidationError('Seleccioná al menos un lote de origen y aplicá los filtros.')
     if agrupacion not in {'dia', 'semana', 'mes'}:
@@ -358,13 +373,13 @@ def construir_estadisticas_fuentes(*, batch_eges_ids, lote_netterm_ids, fecha_de
             (item for item in cambios if item['absoluta'] < 0), key=lambda item: (item['absoluta'], item['practica']),
         )[:5]
     for clave, indicador in [('pacientes', 'pacientes_atendidos'), ('practicas', 'practicas_realizadas'),
-                             ('practicas_por_paciente', 'practicas_por_paciente')]:
+                             ('practicas_por_paciente', 'practicas_por_paciente'), ('promedio_dia', 'promedio_dia')]:
         comparativa[clave] = _metrica(kpis[indicador], previo[indicador] if previo else None)
     fuente = 'EGES + Netterm' if batch_eges_ids and lote_netterm_ids else 'EGES' if batch_eges_ids else 'Netterm'
     if dashboard_global:
         fuente = 'EGES + aporte Netterm validado' if incluir_netterm else 'EGES'
     medicion.marcar('indicadores')
-    return {
+    resultado = {
         'kpis': kpis,
         'temporal': {'labels': [periodo.strftime(formato) for periodo in periodos], 'datasets': datasets},
         'dia_semana': _grafico(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
@@ -414,3 +429,7 @@ def construir_estadisticas_fuentes(*, batch_eges_ids, lote_netterm_ids, fecha_de
                       'cobertura_confirmada': False,
                       'advertencia_cobertura': False},
     }
+    if detalle_director:
+        from .services_director import construir_detalle_director
+        resultado['director'] = construir_detalle_director(filas)
+    return resultado

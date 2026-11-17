@@ -24,9 +24,9 @@
             </div>
             <div class="text-right text-xs text-gray-400">
                 {% if fecha_min and fecha_max %}
-                    Datos disponibles: {{ fecha_min|date:"d/m/Y" }} — {{ fecha_max|date:"d/m/Y" }}
+                    Histórico EGES disponible: {{ fecha_min|date:"d/m/Y" }} — {{ fecha_max|date:"d/m/Y" }}
                 {% endif %}
-                <br>Total registros: {{ total_estudios|default:"0" }}
+                <br>Prácticas del período: <span id="total-periodo">—</span>
             </div>
         </div>
     </header>
@@ -42,7 +42,7 @@
                     <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Período rápido</label>
                     <div class="flex gap-1" id="btn-periodo-group">
                         <button data-dias="30"  class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">30 días</button>
-                        <button data-dias="90"  class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">90 días</button>
+                        <button data-dias="90"  class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">Últimos tres meses cargados</button>
                         <button data-dias="180" class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">6 meses</button>
                         <button data-dias="365" class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">12 meses</button>
                         <button data-dias="0"   class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white font-medium">Todo</button>
@@ -114,11 +114,18 @@
             </div>
         </div>
 
+        <div class="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 lg:col-span-2">
+            <label class="inline-flex items-center gap-2 text-sm font-medium text-blue-900">
+                <input id="incluir-netterm" type="checkbox" {% if hay_aportes_netterm %}checked{% endif %}>
+                Incluir aporte Netterm validado
+            </label>
+            <p id="estado-produccion" role="status" aria-live="polite" class="mt-2 text-sm text-blue-900">Preparando consulta…</p>
+        </div>
         <!-- ── KPIs ────────────────────────────────────────────────────────────── -->
         <div class="order-2 grid grid-cols-2 gap-4 mb-6 lg:col-span-2 lg:grid-cols-4" id="kpis-container">
             <!-- se pueblan via JS -->
             <div class="kpi-card bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Finalizados</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Prácticas realizadas</p>
                 <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-total">—</p>
                 <p class="text-xs text-gray-400 mt-1">estudios informados</p>
             </div>
@@ -128,14 +135,14 @@
                 <p class="text-xs text-gray-400 mt-1">días hábiles del período</p>
             </div>
             <div class="kpi-card bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tasa de Conversión</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pacientes identificados</p>
                 <p class="text-3xl font-bold text-green-600 mt-2" id="kpi-tasa">—</p>
-                <p class="text-xs text-gray-400 mt-1">turnos que terminan informados</p>
+                <p class="text-xs text-gray-400 mt-1">pacientes únicos del período</p>
             </div>
             <div class="kpi-card bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pendientes</p>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Prácticas por paciente</p>
                 <p class="text-3xl font-bold text-amber-500 mt-2" id="kpi-pendientes">—</p>
-                <p class="text-xs text-gray-400 mt-1">turnos sin informe</p>
+                <p class="text-xs text-gray-400 mt-1">entre pacientes identificados</p>
             </div>
         </div>
         <!-- RX sin informe: se muestra solo si > 0 -->
@@ -376,7 +383,7 @@ let estado = {
     fechaDesde: '',
     fechaHasta: '',
     agrupacion: 'mes',
-    modalidades: new Set(),  // vacío = Todas
+    modalidades: new Set(['TC', 'ECO']),  // vacío = Todas
     obrasSociales: new Set(),
 };
 
@@ -399,12 +406,68 @@ let charts = {
 let tipoTemporal = 'line';
 let tipoMedicos = 'bar';
 let opcionesObrasSociales = new Map();
+let consultaCompartida = null;
+let colaConsultas = Promise.resolve();
+let revisionConsulta = 0;
+
+async function consultarDirector(url) {
+    const destino = new URL(url, window.location.origin);
+    const ruta = destino.pathname.slice(BASE.length);
+    const params = destino.searchParams;
+    params.set('agrupacion', estado.agrupacion);
+    params.delete('obras_sociales[]');
+    params.sort();
+    const filtro = params.toString();
+    if (!consultaCompartida || consultaCompartida.filtro !== filtro) {
+        const revision = revisionConsulta;
+        document.getElementById('estado-produccion').textContent = 'Actualizando producción…';
+        const promesa = colaConsultas.catch(() => {}).then(async () => {
+            if (revision !== revisionConsulta) throw new Error('La selección fue reemplazada.');
+            const response = await fetch(`${BASE}/fuentes-data/?${filtro}`);
+            if (!response.headers.get('content-type')?.includes('application/json')) {
+                throw new Error(`El servidor no pudo completar la consulta (${response.status}). Volvé a actualizar.`);
+            }
+            const datos = await response.json();
+            if (!response.ok) throw new Error(datos.error || 'No se pudo cargar la producción.');
+            if (revision !== revisionConsulta) throw new Error('La selección fue reemplazada.');
+            const meta = datos.metadatos;
+            const avisos = meta.advertencias_dashboard || [];
+            document.getElementById('estado-produccion').textContent =
+                `${meta.fuente} · ${formatNum(meta.aporte_netterm_aplicado)} prácticas aportadas por Netterm. `
+                + `${formatNum(meta.sin_identidad)} prácticas pendientes de identificación. ` + avisos.join(' ');
+            document.getElementById('total-periodo').textContent = formatNum(datos.kpis.practicas_realizadas);
+            return datos;
+        });
+        colaConsultas = promesa;
+        consultaCompartida = {filtro, promesa};
+    }
+    const datos = await consultaCompartida.promesa;
+    const secciones = {
+        '/kpis/': datos.kpis, '/analisis-temporal/': datos.temporal,
+        '/distribucion/': datos.modalidad, '/eco/': datos.sub_eco,
+        '/franja-horaria/': datos.franja, '/medicos/': datos.medicos,
+        '/obras-sociales/': datos.obras_sociales, '/comparativa/': datos.comparativa,
+        '/dia-semana/': datos.dia_semana, '/guardias/': datos.director.guardias,
+        '/practicas/': datos.director.practicas,
+        '/practicas/evolucion/': datos.director.procedimientos,
+        '/doppler-ecocardio/': datos.director.doppler,
+        '/obras-sociales/evolucion/': datos.director.obras_sociales_evolucion,
+    };
+    if (ruta === '/obras-sociales/evolucion/') {
+        const grafico = secciones[ruta];
+        const seleccion = estado.obrasSociales;
+        return {...grafico, datasets: grafico.datasets.filter(serie => !seleccion.size || seleccion.has(serie.label)).slice(0, 8)};
+    }
+    return secciones[ruta];
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 function buildParams(extra = {}) {
     const p = new URLSearchParams();
+    p.set('agrupacion', estado.agrupacion);
+    p.set('incluir_netterm', document.getElementById('incluir-netterm').checked ? '1' : '0');
     if (estado.fechaDesde) p.set('fecha_desde', estado.fechaDesde);
     if (estado.fechaHasta) p.set('fecha_hasta', estado.fechaHasta);
     estado.modalidades.forEach(m => p.append('modalidades[]', m));
@@ -426,9 +489,7 @@ function setChartLoading(canvas, isLoading) {
 async function cargarDatosGrafico(canvas, url) {
     setChartLoading(canvas, true);
     try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`No se pudieron cargar los datos (${response.status})`);
-        return await response.json();
+        return await consultarDirector(url);
     } catch (error) {
         setChartLoading(canvas, false);
         throw error;
@@ -439,16 +500,35 @@ function formatNum(n) {
     return n === undefined || n === null ? '—' : Number(n).toLocaleString('es-AR');
 }
 
+function mostrarResto(canvas, datos) {
+    const id = `${canvas}-resto`;
+    document.getElementById(id)?.remove();
+    const detalles = document.createElement('details');
+    detalles.id = id;
+    detalles.className = 'px-5 py-3 text-xs text-gray-600';
+    const resumen = document.createElement('summary');
+    resumen.textContent = `Fuera del top 10: ${formatNum(datos.total_resto)} prácticas. Sin dato: ${formatNum(datos.sin_dato)}.`;
+    detalles.append(resumen);
+    const lista = document.createElement('ul');
+    lista.className = 'mt-2 max-h-40 overflow-y-auto';
+    (datos.resto || []).forEach(item => {
+        const linea = document.createElement('li');
+        linea.textContent = `${item.nombre} · ${formatNum(item.total)}`;
+        lista.append(linea);
+    });
+    detalles.append(lista);
+    document.getElementById(canvas).parentElement.after(detalles);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // KPIs
 // ─────────────────────────────────────────────────────────────────────────────
 async function cargarKPIs() {
-    const r = await fetch(`${BASE}/kpis/?${buildParams()}`);
-    const d = await r.json();
-    document.getElementById('kpi-total').textContent = formatNum(d.total_finalizados);
+    const d = await consultarDirector(`${BASE}/kpis/?${buildParams()}`);
+    document.getElementById('kpi-total').textContent = formatNum(d.practicas_realizadas);
     document.getElementById('kpi-promedio').textContent = d.promedio_dia;
-    document.getElementById('kpi-tasa').textContent = d.tasa_conversion + '%';
-    document.getElementById('kpi-pendientes').textContent = formatNum(d.total_pendientes);
+    document.getElementById('kpi-tasa').textContent = formatNum(d.pacientes_atendidos);
+    document.getElementById('kpi-pendientes').textContent = d.practicas_por_paciente ?? 'Sin identificación suficiente';
     // Card informativa RX sin informe
     const rxSI = d.rx_sin_informe || 0;
     document.getElementById('kpi-rx-sin-informe').textContent = formatNum(rxSI);
@@ -578,6 +658,7 @@ async function cargarFranja() {
 // ─────────────────────────────────────────────────────────────────────────────
 async function cargarMedicos() {
     const d = await cargarDatosGrafico('grafico-medicos', `${BASE}/medicos/?${buildParams({ agrupacion: estado.agrupacion })}`);
+    mostrarResto('grafico-medicos', d);
 
     const isHoriz = tipoMedicos === 'horizontalBar';
 
@@ -614,8 +695,7 @@ function cambiarTipoMedico(tipo) {
 // Comparativa período anterior
 // ─────────────────────────────────────────────────────────────────────────────
 async function cargarComparativa() {
-    const r = await fetch(`${BASE}/comparativa/?${buildParams()}`);
-    const d = await r.json();
+    const d = await consultarDirector(`${BASE}/comparativa/?${buildParams()}`);
     const comparativa = d.comparativa;
     const formatoNumero = (valor, decimales = 0) => Number(valor || 0).toLocaleString('es-AR', {
         minimumFractionDigits: decimales,
@@ -630,6 +710,11 @@ async function cargarComparativa() {
     };
 
     function renderMetrica(metrica, valoresId, deltaId, decimales = 0) {
+        if (metrica.actual === null || metrica.anterior === null) {
+            document.getElementById(valoresId).textContent = 'Sin período comparable';
+            document.getElementById(deltaId).textContent = comparativa.motivo_sin_comparativa;
+            return;
+        }
         document.getElementById(valoresId).textContent =
             `${formatoNumero(metrica.actual, decimales)} vs ${formatoNumero(metrica.anterior, decimales)}`;
         const delta = document.getElementById(deltaId);
@@ -694,6 +779,7 @@ async function cargarHallazgos() {
 // ─────────────────────────────────────────────────────────────────────────────
 async function cargarObrasSociales() {
     const d = await cargarDatosGrafico('grafico-obras-sociales', `${BASE}/obras-sociales/?${buildParams()}`);
+    mostrarResto('grafico-obras-sociales', d);
 
     destroyAndCreate('obrasSociales', 'grafico-obras-sociales', {
         type: 'bar',
@@ -756,7 +842,14 @@ async function cargarDopplerEcocardio() {
 function setPeriodo(dias) {
     const hoy = new Date();
     const hasta = hoy.toISOString().slice(0, 10);
-    if (dias === 0) {
+    if (dias === 90 && '{{ fecha_referencia|date:"Y-m-d" }}') {
+        const [anio, mes] = '{{ fecha_referencia|date:"Y-m-d" }}'.split('-').map(Number);
+        const fechaISO = fecha => `${fecha.getFullYear()}-${String(fecha.getMonth()+1).padStart(2,'0')}-${String(fecha.getDate()).padStart(2,'0')}`;
+        estado.fechaDesde = fechaISO(new Date(anio, mes - 3, 1));
+        estado.fechaHasta = fechaISO(new Date(anio, mes, 0));
+        document.getElementById('fecha-desde').value = estado.fechaDesde;
+        document.getElementById('fecha-hasta').value = estado.fechaHasta;
+    } else if (dias === 0) {
         estado.fechaDesde = '';
         estado.fechaHasta = '';
         document.getElementById('fecha-desde').value = '';
@@ -775,6 +868,9 @@ function setPeriodo(dias) {
 // Init
 // ─────────────────────────────────────────────────────────────────────────────
 function cargarTodo() {
+    revisionConsulta += 1;
+    const revision = revisionConsulta;
+    consultaCompartida = null;
     Promise.all([
         cargarKPIs(),
         cargarTemporal(),
@@ -790,13 +886,21 @@ function cargarTodo() {
         cargarObrasSocialesEvolucion(),
         cargarPunciones(),
         cargarDopplerEcocardio(),
-    ]).catch(err => console.error('Error al cargar datos:', err));
+    ]).catch(err => {
+        if (revision !== revisionConsulta) return;
+        document.getElementById('estado-produccion').textContent = err.message + ' Los gráficos conservan la última consulta completada.';
+        document.querySelectorAll('.chart-loading').forEach(loader => loader.classList.add('hidden'));
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
 
-    // Período por defecto: mostrar todo
-    setPeriodo(0);
+    setPeriodo(90);
+    document.querySelectorAll('.btn-periodo').forEach(btn => {
+        btn.className = btn.dataset.dias === '90'
+            ? 'btn-periodo px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white font-medium'
+            : 'btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+    });
 
     // Botones de período rápido
     document.querySelectorAll('.btn-periodo').forEach(btn => {
@@ -888,6 +992,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.getElementById('btn-aplicar').addEventListener('click', function () {
+        actualizarHrefPdf();
+        cargarTodo();
+    });
+    document.getElementById('incluir-netterm').addEventListener('change', function () {
         actualizarHrefPdf();
         cargarTodo();
     });
