@@ -782,3 +782,32 @@ mismos bytes del libro en ambos intentos. Antes generaba un XLSX nuevo en cada
 intento, cuyo contenido binario puede variar por las fechas internas del archivo.
 El control de reimportación sigue verificando el mismo archivo. git diff --check
 pasó. La prueba visual y la medición posterior en Heroku siguen pendientes.
+
+## Construcción del dashboard desde 6078e4fb, 17 de noviembre
+
+El usuario indicó que el commit posterior `d0246fa9` no le sirvió y pidió volver a
+`6078e4fb`, optimizar los dashboards del servicio y del director desde esa base y
+retirar los commits posteriores. Heroku se revirtió a v532 (`6078e4fb`). La rama
+local y luego `origin/feature/eges-netterm` quedaron también en esa base; el push
+con lease no reemplazó el remoto porque, al comprobarlo, ya apuntaba a `6078e4fb`.
+No se ejecutó un despliegue de la optimización descrita aquí.
+
+El cambio local posterior agrupa en dos consultas las modalidades de los lotes
+EGES y Netterm asociados a las validaciones aprobadas, en lugar de repetir ambas
+consultas por cada validación. La lectura de observaciones Netterm que sustituyen
+versiones anteriores se conserva con `iterator(chunk_size=500)` para no mantener
+otra copia global de esas claves en memoria. Se mantiene la exclusión de RX de
+validaciones antiguas que carecen de `unidades_estadisticas`.
+
+Se añadió una regresión que compara una y dos validaciones: conserva los totales
+esperados (2 y 3 prácticas) y limita el crecimiento de consultas a un máximo de
+dos. Pasaron las pruebas de dashboard, Portal del Director y producción; no hubo
+cambios de esquema. En QA local con SQLite temporal sintética, ambos dashboards
+mostraron una práctica EGES con Netterm desactivado y dos al activarlo; al volver
+a desactivarlo regresaron a una. La base temporal se eliminó.
+
+El commit local y remoto actual es `b159c483`, que contiene únicamente
+`eges_import/services_dashboard.py` y `eges_import/tests_dashboard.py`, y está
+basado en `6078e4fb`. El árbol local estaba limpio al verificarlo. No se midió
+esta optimización con el volumen productivo ni se verificó visualmente en Heroku;
+esa medición queda pendiente antes de decidir un despliegue.
