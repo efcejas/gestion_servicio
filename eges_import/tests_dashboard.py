@@ -108,6 +108,30 @@ class BaseEgesDashboardTest(FuentesSinteticasMixin, TestCase):
         self.assertEqual(combinado['metadatos']['aporte_netterm_aplicado'], 2)
         self.assertEqual(ProduccionValidada.objects.count(), 2)
 
+    def test_dashboard_precarga_datos_compartidos_al_combinar_validaciones(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        from .services_dashboard import construir_produccion_dashboard
+
+        self.cargar_eco_aprobada()
+        with CaptureQueriesContext(connection) as una_validacion:
+            una = construir_produccion_dashboard(incluir_netterm=True)
+
+        lote_anterior = self.lote
+        self.lote = self.nuevo_netterm('c')
+        self.netterm(pedido='otra-practica', documento='44444444')
+        self.aprobar(lotes=[lote_anterior.pk, self.lote.pk])
+        with CaptureQueriesContext(connection) as dos_validaciones:
+            dos = construir_produccion_dashboard(incluir_netterm=True)
+
+        consultas_una = sum(query['sql'].lstrip().upper().startswith('SELECT')
+                            for query in una_validacion.captured_queries)
+        consultas_dos = sum(query['sql'].lstrip().upper().startswith('SELECT')
+                            for query in dos_validaciones.captured_queries)
+        self.assertEqual(una['total_produccion'], 2)
+        self.assertEqual(dos['total_produccion'], 3)
+        self.assertLessEqual(consultas_dos, consultas_una + 2)
+
     def test_actualizacion_de_realizacion_traslada_aporte_entre_meses_una_sola_vez(self):
         self.cargar_eco_aprobada()
         self.lote = self.nuevo_netterm()

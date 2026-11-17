@@ -1,5 +1,5 @@
 """Base EGES completa y aportes Netterm aprobados por período y modalidad."""
-from collections import Counter
+from collections import Counter, defaultdict
 import hashlib
 import json
 
@@ -105,22 +105,50 @@ def construir_produccion_dashboard(*, incluir_netterm=False):
                 or not set(validacion.lotes_netterm_ids).issubset(lotes_netterm)):
             continue
         snapshot = leer_produccion_validada(validacion)
+        modalidades = {item['fila']['modalidad'] for item in snapshot['practicas']}
+        rx_incompleto = any(item['fila']['modalidad'] == 'RX'
+                            and 'unidades_estadisticas' not in item
+                            for item in snapshot['practicas'])
         # El objeto de metadatos deja de retener el JSON completo ya leído.
         del validacion.resultado_json
-        modalidades = set(EgesRow.objects.filter(batch_id__in=validacion.lotes_eges_ids).order_by()
-                          .values_list('modalidad', flat=True).distinct())
-        modalidades.update(_modalidad_consolidada(modalidad) for modalidad in
-                           NettermFila.objects.filter(lote_id__in=validacion.lotes_netterm_ids).order_by()
-                           .values_list('modalidad', flat=True).distinct())
-        modalidades.update(item['fila']['modalidad'] for item in snapshot['practicas'])
-        if any(item['fila']['modalidad'] == 'RX' and 'unidades_estadisticas' not in item
-               for item in snapshot['practicas']):
+        if rx_incompleto:
             modalidades.discard('RX')
             snapshot['practicas'] = [item for item in snapshot['practicas']
                                      if item['fila']['modalidad'] != 'RX']
             advertencias.append('Hay una validación anterior de RX que requiere revisar cantidades. '
                                 'Revalidá ese período para incorporar su aporte Netterm.')
-        validaciones.append({'validacion': validacion, 'snapshot': snapshot, 'modalidades': modalidades})
+        validaciones.append({
+            'validacion': validacion,
+            'snapshot': snapshot,
+            'modalidades': modalidades,
+            'rx_incompleto': rx_incompleto,
+        })
+
+    batches_validados = {batch_id for info in validaciones
+                         for batch_id in info['validacion'].lotes_eges_ids}
+    lotes_netterm_validados = {lote_id for info in validaciones
+                               for lote_id in info['validacion'].lotes_netterm_ids}
+    modalidades_eges = defaultdict(set)
+    for batch_id, modalidad in EgesRow.objects.filter(batch_id__in=batches_validados).order_by(
+    ).values_list('batch_id', 'modalidad').distinct().iterator(chunk_size=500):
+        modalidades_eges[batch_id].add(modalidad)
+    modalidades_netterm = defaultdict(set)
+    for lote_id, modalidad in NettermFila.objects.filter(lote_id__in=lotes_netterm_validados).order_by(
+    ).values_list('lote_id', 'modalidad').distinct().iterator(chunk_size=500):
+        modalidades_netterm[lote_id].add(_modalidad_consolidada(modalidad))
+    for info in validaciones:
+        validacion = info['validacion']
+        info['modalidades'].update(
+            modalidad for batch_id in validacion.lotes_eges_ids
+            for modalidad in modalidades_eges[batch_id]
+        )
+        info['modalidades'].update(
+            modalidad for lote_id in validacion.lotes_netterm_ids
+            for modalidad in modalidades_netterm[lote_id]
+        )
+        if info['rx_incompleto']:
+            info['modalidades'].discard('RX')
+
     cubiertos = {item['fila']['id'] for info in validaciones for item in info['snapshot']['practicas']
                  if 'fecha_turno' in item['fila']
                  and _validacion_del_estudio(validaciones, item['fecha_produccion'], item['fila']['modalidad']) is info}
@@ -159,11 +187,13 @@ def construir_produccion_dashboard(*, incluir_netterm=False):
         # Su versión anterior queda sustituida también si la nueva revisión lo excluyó.
         vistos_eges.update(eges_version)
         vistos_nt.update(claves_version)
-        vistos_nt.update(_clave_estudio_netterm(fila) for fila in NettermFila.objects.filter(
+        filas_version = NettermFila.objects.filter(
             lote_id__in=validacion.lotes_netterm_ids,
             fecha_realizacion__gte=validacion.fecha_desde,
             fecha_realizacion__lte=validacion.fecha_hasta,
-        ).only('clave_candidata_sha256', 'normalizados_json'))
+        ).only('clave_candidata_sha256', 'normalizados_json')
+        vistos_nt.update(_clave_estudio_netterm(fila)
+                         for fila in filas_version.iterator(chunk_size=500))
         if utilizada:
             versiones.append(validacion.pk)
         modalidades_afectadas = sorted(modalidad for pk, modalidad in afectados if pk == validacion.pk)
