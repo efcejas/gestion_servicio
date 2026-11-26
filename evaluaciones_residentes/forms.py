@@ -222,6 +222,14 @@ class AnulacionIntentoForm(forms.Form):
     )
 
 
+class ReversionCorreccionForm(forms.Form):
+    motivo = forms.CharField(
+        label='Motivo de reapertura', min_length=10,
+        widget=forms.Textarea(attrs={'class': FORM_CONTROL, 'rows': 3}),
+        help_text='El motivo, tu usuario y la corrección anterior quedan registrados.',
+    )
+
+
 class RecuperacionIntentoForm(forms.Form):
     motivo = forms.CharField(
         label='Motivo de recuperación',

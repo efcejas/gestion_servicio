@@ -314,3 +314,77 @@ class EvaluacionServicesTests(TestCase):
         self.assertEqual(asignacion.anio_residencia_al_asignar, 'R1')
         self.assertEqual(asignacion.ciclo_lectivo, '2026')
         self.assertTrue(self.examen.esta_disponible_para(self.residente))
+
+
+class ReabrirCorreccionTests(TestCase):
+    setUp = EvaluacionServicesTests.setUp
+
+    def crear_corregido(self):
+        from evaluaciones_residentes.models import Respuesta
+        self.pregunta.tipo = Pregunta.DESARROLLO
+        self.pregunta.save()
+        intento = IntentoExamen.objects.create(
+            examen=self.examen, residente=self.residente,
+            estado=IntentoExamen.CORREGIDO, nota_final=Decimal('8'),
+            resultado_publicado_en=timezone.now(),
+        )
+        Respuesta.objects.create(intento=intento, pregunta=self.pregunta,
+            texto_desarrollo='Respuesta original', puntaje_obtenido=Decimal('1.6'),
+            comentario_docente='Revisar')
+        return intento
+
+    def test_reabre_con_auditoria_y_permite_corregir_y_publicar(self):
+        from evaluaciones_residentes.services import reabrir_correccion
+        intento = self.crear_corregido()
+        perfiles = (
+            ('instructor_residentes', False),
+            ('jefe_residentes', False),
+            ('jefe_servicio', False),
+            ('medico_staff', True),
+        )
+        for rol, es_superusuario in perfiles:
+            with self.subTest(rol=rol, superusuario=es_superusuario):
+                self.docente.rol = rol
+                self.docente.is_superuser = es_superusuario
+                self.docente.save()
+                intento = reabrir_correccion(intento, self.docente, 'Aprobación por error')
+                self.assertEqual(intento.estado, IntentoExamen.PENDIENTE_CORRECCION)
+                self.assertIsNone(intento.resultado_publicado_en)
+                self.assertIsNone(intento.nota_final)
+                respuesta = intento.respuestas.get()
+                self.assertEqual(respuesta.texto_desarrollo, 'Respuesta original')
+                self.assertTrue(respuesta.requiere_correccion)
+                self.assertEqual(intento.reversiones.first().usuario, self.docente)
+                corregir_respuesta_desarrollo(respuesta, Decimal('1'), 'Revisado', self.docente)
+                intento = finalizar_correccion_manual(intento, self.docente)
+                intento = publicar_resultado(intento, self.docente)
+                self.assertEqual(intento.nota_final, Decimal('5'))
+        self.assertEqual(intento.reversiones.count(), 4)
+
+    def test_rechaza_residente_motivo_vacio_y_estado_obsoleto(self):
+        from evaluaciones_residentes.services import reabrir_correccion
+        from evaluaciones_residentes.exceptions import PermisoEvaluacionError
+        intento = self.crear_corregido()
+        with self.assertRaises(PermisoEvaluacionError):
+            reabrir_correccion(intento, self.residente, 'Aprobación por error')
+        with self.assertRaises(RespuestasInvalidasError):
+            reabrir_correccion(intento, self.docente, '  ')
+        reabrir_correccion(intento, self.docente, 'Aprobación por error')
+        with self.assertRaises(TransicionEvaluacionError):
+            reabrir_correccion(intento, self.docente, 'Aprobación por error')
+        self.assertEqual(intento.reversiones.count(), 1)
+
+    def test_no_reabre_correccion_automatica(self):
+        from evaluaciones_residentes.services import reabrir_correccion
+        intento = IntentoExamen.objects.create(examen=self.examen, residente=self.residente,
+            estado=IntentoExamen.CORREGIDO)
+        with self.assertRaises(TransicionEvaluacionError):
+            reabrir_correccion(intento, self.docente, 'Aprobación por error')
+        self.assertFalse(intento.reversiones.exists())
+
+    def test_publicacion_obsoleta_no_republica_resultado_reabierto(self):
+        from evaluaciones_residentes.services import reabrir_correccion
+        intento = self.crear_corregido()
+        reabrir_correccion(intento, self.docente, 'Aprobación por error')
+        with self.assertRaises(TransicionEvaluacionError):
+            publicar_resultado(intento, self.docente)

@@ -19,6 +19,25 @@
         <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"><p class="text-xs uppercase text-gray-500">Resultado</p><p class="mt-1 font-bold text-gray-900">{% if intento.resultado_publicado_en %}Publicado{% else %}No publicado{% endif %}</p></div>
     </section>
 
+    {% if intento.estado == 'CORREGIDO' and respuestas_desarrollo %}
+    <details class="rounded-xl border border-amber-200 bg-white p-5 shadow-sm">
+        <summary class="cursor-pointer font-semibold text-amber-900">Reabrir corrección</summary>
+        <p class="mt-3 text-sm text-gray-700">Retira la nota publicada y devuelve la entrega a corrección manual. Conserva las respuestas del residente y los puntajes anteriores para revisarlos. Luego deberás guardar la corrección y publicar nuevamente el resultado.</p>
+        <form method="post" class="mt-4 space-y-3">
+            {% csrf_token %}<input type="hidden" name="accion" value="reabrir_correccion">
+            {{ reversion_form.as_p }}
+            <button type="submit" class="rounded-lg bg-amber-600 px-4 py-2.5 font-semibold text-white">Confirmar reapertura</button>
+        </form>
+    </details>
+    {% endif %}
+    {% for reversion in intento.reversiones.all %}
+    <section class="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-700">
+        <p class="font-semibold">Corrección reabierta por {{ reversion.usuario.get_full_name|default:reversion.usuario.username }} el {{ reversion.creada_en|date:'d/m/Y H:i' }}</p>
+        <p class="mt-2 whitespace-pre-line">{{ reversion.motivo }}</p>
+        <p class="mt-2">Nota anterior: {{ reversion.resultado_anterior.nota_final }}</p>
+    </section>
+    {% endfor %}
+
     {% if intento.estado == 'ANULADO' %}
     <section class="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-900">
         <p class="font-bold"><i class="fas fa-ban mr-2" aria-hidden="true"></i>Intento anulado</p>

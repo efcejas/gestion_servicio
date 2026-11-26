@@ -386,6 +386,17 @@ class IntentoExamen(models.Model):
         return f'{self.examen} - {self.residente}'
 
 
+class ReversionCorreccion(models.Model):
+    intento = models.ForeignKey(IntentoExamen, on_delete=models.PROTECT, related_name='reversiones')
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    creada_en = models.DateTimeField(auto_now_add=True)
+    motivo = models.TextField()
+    resultado_anterior = models.JSONField()
+
+    class Meta:
+        ordering = ['-creada_en', '-pk']
+
+
 class Respuesta(models.Model):
     intento = models.ForeignKey(
         IntentoExamen,

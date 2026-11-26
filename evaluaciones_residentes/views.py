@@ -9,7 +9,7 @@ from django.utils import timezone
 from accounts.decorators import role_required
 
 from .exceptions import EvaluacionError
-from .forms import AnulacionIntentoForm, CorreccionRespuestaForm, ExamenForm, OpcionFormSet, PreguntaForm, RecuperacionIntentoForm
+from .forms import ReversionCorreccionForm, AnulacionIntentoForm, CorreccionRespuestaForm, ExamenForm, OpcionFormSet, PreguntaForm, RecuperacionIntentoForm
 from .models import Examen, IntentoExamen, Pregunta, PreguntaImagen
 from .selectors import (
     asignacion_para_residente,
@@ -33,6 +33,7 @@ from .services import (
     publicar_examen,
     publicar_resultado,
     recuperar_intento,
+    reabrir_correccion,
 )
 
 
@@ -197,6 +198,7 @@ def revisar_intento(request, intento_id):
         request.POST or None,
         prefix='recuperacion',
     )
+    reversion_form = ReversionCorreccionForm(request.POST or None, prefix='reversion')
     accion = request.POST.get('accion') if request.method == 'POST' else None
     if request.method == 'POST' and accion == 'corregir':
         if intento.estado != IntentoExamen.PENDIENTE_CORRECCION:
@@ -222,6 +224,14 @@ def revisar_intento(request, intento_id):
                     return redirect('evaluaciones_residentes:revisar_intento', intento_id=intento.pk)
                 except EvaluacionError as exc:
                     messages.error(request, str(exc))
+    elif request.method == 'POST' and accion == 'reabrir_correccion':
+        if reversion_form.is_valid():
+            try:
+                reabrir_correccion(intento, request.user, reversion_form.cleaned_data['motivo'])
+                messages.success(request, 'Corrección reabierta. El resultado queda pendiente de revisión y publicación.')
+                return redirect('evaluaciones_residentes:revisar_intento', intento_id=intento.pk)
+            except EvaluacionError as exc:
+                messages.error(request, str(exc))
     elif request.method == 'POST' and accion == 'publicar':
         try:
             publicar_resultado(intento, request.user)
@@ -263,6 +273,7 @@ def revisar_intento(request, intento_id):
             (respuesta, formularios[respuesta.pk])
             for respuesta in respuestas_desarrollo
         ],
+        'reversion_form': reversion_form,
         'anulacion_form': anulacion_form,
         'recuperacion_form': recuperacion_form,
     })

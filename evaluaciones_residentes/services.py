@@ -18,6 +18,7 @@ from .models import (
     Pregunta,
     Respuesta,
     RespuestaOpcion,
+    ReversionCorreccion,
 )
 
 
@@ -483,12 +484,51 @@ def finalizar_correccion_manual(intento, usuario):
     return intento
 
 
-def publicar_resultado(intento, usuario, ahora=None):
-    if not _puede_gestionar_examen(usuario, intento.examen):
-        raise PermisoEvaluacionError('El usuario no puede publicar este resultado.')
-    if intento.estado != IntentoExamen.CORREGIDO:
-        raise TransicionEvaluacionError('Solo se puede publicar un resultado corregido.')
+def reabrir_correccion(intento, usuario, motivo):
+    """Retira el resultado y conserva las respuestas y la corrección anterior."""
+    if not (usuario.is_superuser or usuario.rol in ROLES_PUBLICADORES):
+        raise PermisoEvaluacionError('El usuario no puede reabrir esta corrección.')
+    motivo = str(motivo or '').strip()
+    if len(motivo) < 10:
+        raise RespuestasInvalidasError('Indicá un motivo de al menos 10 caracteres.')
+    with transaction.atomic():
+        intento = IntentoExamen.objects.select_for_update().get(pk=intento.pk)
+        if intento.estado != IntentoExamen.CORREGIDO:
+            raise TransicionEvaluacionError('Solo se puede reabrir un intento corregido.')
+        respuestas = intento.respuestas.filter(pregunta__tipo=Pregunta.DESARROLLO)
+        if not respuestas.exists():
+            raise TransicionEvaluacionError('Este intento no tiene respuestas de corrección manual.')
+        ReversionCorreccion.objects.create(
+            intento=intento, usuario=usuario, motivo=motivo,
+            resultado_anterior={
+                'puntaje_obtenido': str(intento.puntaje_obtenido),
+                'porcentaje': str(intento.porcentaje),
+                'nota_final': str(intento.nota_final),
+                'publicado_en': intento.resultado_publicado_en.isoformat() if intento.resultado_publicado_en else None,
+                'respuestas': [
+                    {'id': r.pk, 'puntaje': str(r.puntaje_obtenido), 'comentario': r.comentario_docente}
+                    for r in respuestas
+                ],
+            },
+        )
+        respuestas.update(requiere_correccion=True)
+        intento.estado = IntentoExamen.PENDIENTE_CORRECCION
+        intento.resultado_publicado_en = None
+        intento.puntaje_obtenido = None
+        intento.porcentaje = None
+        intento.nota_final = None
+        intento.save(update_fields=['estado', 'resultado_publicado_en', 'puntaje_obtenido', 'porcentaje', 'nota_final'])
+    return intento
 
-    intento.resultado_publicado_en = ahora or timezone.now()
-    intento.save(update_fields=['resultado_publicado_en'])
+
+def publicar_resultado(intento, usuario, ahora=None):
+    with transaction.atomic():
+        intento = IntentoExamen.objects.select_for_update().select_related('examen').get(pk=intento.pk)
+        if not _puede_gestionar_examen(usuario, intento.examen):
+            raise PermisoEvaluacionError('El usuario no puede publicar este resultado.')
+        if intento.estado != IntentoExamen.CORREGIDO:
+            raise TransicionEvaluacionError('Solo se puede publicar un resultado corregido.')
+
+        intento.resultado_publicado_en = ahora or timezone.now()
+        intento.save(update_fields=['resultado_publicado_en'])
     return intento

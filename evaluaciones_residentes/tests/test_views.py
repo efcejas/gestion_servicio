@@ -933,3 +933,34 @@ class EvaluacionViewsTests(TestCase):
         pregunta.refresh_from_db()
         self.assertEqual(pregunta.tipo, Pregunta.DESARROLLO)
         self.assertEqual(pregunta.opciones.count(), 0)
+
+
+class ReabrirCorreccionViewsTests(TestCase):
+    setUp = EvaluacionViewsTests.setUp
+
+    def test_reabrir_desde_revision_retira_resultado_para_residente(self):
+        from evaluaciones_residentes.models import Respuesta
+        pregunta = Pregunta.objects.create(examen=self.examen, texto='Desarrollar',
+            tipo=Pregunta.DESARROLLO, orden=1)
+        intento = IntentoExamen.objects.create(examen=self.examen,
+            residente=self.residente, estado=IntentoExamen.CORREGIDO,
+            resultado_publicado_en=timezone.now(), nota_final=8)
+        Respuesta.objects.create(intento=intento, pregunta=pregunta, texto_desarrollo='Texto')
+        self.client.force_login(self.docente)
+        url = reverse('evaluaciones_residentes:revisar_intento', args=[intento.pk])
+        self.assertContains(self.client.get(url), 'Reabrir corrección')
+        response = self.client.post(url, {'accion': 'reabrir_correccion',
+            'reversion-motivo': 'Se aprobó sin revisar'}, follow=True)
+        self.assertEqual(response.status_code, 200)
+        intento.refresh_from_db()
+        self.assertEqual(intento.estado, IntentoExamen.PENDIENTE_CORRECCION)
+        self.assertIsNone(intento.resultado_publicado_en)
+        self.assertEqual(intento.reversiones.count(), 1)
+        from evaluaciones_residentes.models import DestinatarioExamen
+        DestinatarioExamen.objects.create(examen=self.examen, residente=self.residente,
+            anio_residencia_al_asignar='R1', ciclo_lectivo='2026', criterio_origen=Examen.ANIOS)
+        self.examen.estado = Examen.CERRADO
+        self.examen.save()
+        self.client.force_login(self.residente)
+        response = self.client.get(reverse('evaluaciones_residentes:resultado_residente', args=[self.examen.pk]))
+        self.assertRedirects(response, reverse('evaluaciones_residentes:detalle_residente', args=[self.examen.pk]))
