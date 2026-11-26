@@ -17,6 +17,7 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div><div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">{{ asignacion.ciclo_lectivo }}</span><span class="text-xs text-gray-500">{{ asignacion.anio_residencia_al_asignar }}</span></div><h2 class="mt-2 text-lg font-bold text-gray-900">{{ asignacion.examen.titulo }}</h2><p class="mt-1 text-sm text-gray-600">{{ asignacion.examen.descripcion|default:'Evaluación de residentes' }}</p></div>
             {% with intento=asignacion.examen.intento_del_residente|first %}
+            {% if intento %}<span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">{{ intento.estado_revision }}</span>{% endif %}
             <a href="{% url 'evaluaciones_residentes:detalle_residente' asignacion.examen.pk %}" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-medical-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-medical-primary/90">{% if intento and intento.resultado_publicado_en %}Ver resultado{% elif asignacion.examen.estado == 'CERRADO' %}Ver estado{% elif intento and intento.estado == 'INICIADO' %}Retomar evaluación{% elif intento %}Ver estado{% else %}Ver evaluación{% endif %}<i class="fas fa-arrow-right text-xs"></i></a>
             {% endwith %}
         </div>

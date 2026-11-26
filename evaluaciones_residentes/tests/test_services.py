@@ -351,6 +351,7 @@ class ReabrirCorreccionTests(TestCase):
                 self.assertEqual(intento.estado, IntentoExamen.PENDIENTE_CORRECCION)
                 self.assertIsNone(intento.resultado_publicado_en)
                 self.assertIsNone(intento.nota_final)
+                self.assertTrue(intento.en_revision_nuevamente)
                 respuesta = intento.respuestas.get()
                 self.assertEqual(respuesta.texto_desarrollo, 'Respuesta original')
                 self.assertTrue(respuesta.requiere_correccion)
@@ -359,6 +360,8 @@ class ReabrirCorreccionTests(TestCase):
                 intento = finalizar_correccion_manual(intento, self.docente)
                 intento = publicar_resultado(intento, self.docente)
                 self.assertEqual(intento.nota_final, Decimal('5'))
+                self.assertFalse(intento.en_revision_nuevamente)
+                self.assertEqual(intento.estado_revision, 'Corregido')
         self.assertEqual(intento.reversiones.count(), 4)
 
     def test_rechaza_residente_motivo_vacio_y_estado_obsoleto(self):

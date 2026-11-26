@@ -35,7 +35,7 @@ def intentos_para_docente(usuario, examen_id):
         IntentoExamen.objects
         .filter(examen_id__in=examen_ids)
         .select_related('examen', 'residente')
-        .prefetch_related('respuestas__pregunta')
+        .prefetch_related('respuestas__pregunta', 'reversiones')
     )
 
 
@@ -47,7 +47,7 @@ def asignaciones_para_residente(usuario):
         'examen__preguntas',
         Prefetch(
             'examen__intentos',
-            queryset=IntentoExamen.objects.filter(residente=usuario),
+            queryset=IntentoExamen.objects.filter(residente=usuario).prefetch_related('reversiones'),
             to_attr='intento_del_residente',
         ),
     )

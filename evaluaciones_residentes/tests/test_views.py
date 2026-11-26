@@ -956,11 +956,15 @@ class ReabrirCorreccionViewsTests(TestCase):
         self.assertEqual(intento.estado, IntentoExamen.PENDIENTE_CORRECCION)
         self.assertIsNone(intento.resultado_publicado_en)
         self.assertEqual(intento.reversiones.count(), 1)
+        self.assertContains(response, 'En revisión nuevamente')
+        self.assertContains(self.client.get(reverse('evaluaciones_residentes:intentos', args=[self.examen.pk])), 'En revisión nuevamente')
         from evaluaciones_residentes.models import DestinatarioExamen
         DestinatarioExamen.objects.create(examen=self.examen, residente=self.residente,
             anio_residencia_al_asignar='R1', ciclo_lectivo='2026', criterio_origen=Examen.ANIOS)
         self.examen.estado = Examen.CERRADO
         self.examen.save()
         self.client.force_login(self.residente)
+        self.assertContains(self.client.get(reverse('evaluaciones_residentes:mis_evaluaciones')), 'En revisión nuevamente')
+        self.assertContains(self.client.get(reverse('evaluaciones_residentes:detalle_residente', args=[self.examen.pk])), 'La nota anterior fue retirada')
         response = self.client.get(reverse('evaluaciones_residentes:resultado_residente', args=[self.examen.pk]))
         self.assertRedirects(response, reverse('evaluaciones_residentes:detalle_residente', args=[self.examen.pk]))

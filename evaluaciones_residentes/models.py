@@ -386,6 +386,17 @@ class IntentoExamen(models.Model):
         return f'{self.examen} - {self.residente}'
 
 
+    @property
+    def en_revision_nuevamente(self):
+        return self.estado == self.PENDIENTE_CORRECCION and self.reversiones.exists()
+
+    @property
+    def estado_revision(self):
+        if self.en_revision_nuevamente:
+            return 'Reabierto · En revisión nuevamente'
+        return self.get_estado_display()
+
+
 class ReversionCorreccion(models.Model):
     intento = models.ForeignKey(IntentoExamen, on_delete=models.PROTECT, related_name='reversiones')
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
