@@ -17,6 +17,69 @@ MODALIDADES_GUIADAS = {
 CODIGOS_COMPLEMENTARIOS = {'150101', '150111'}
 
 
+def agrupar_ecoguiados_provisionales(practicas, *, componentes_sin_modalidad=(), resueltos=None):
+    """Retira componentes inequívocos sólo cuando la principal está incluida."""
+    from .models import EgesRow, NettermFila
+    from .querysets import filas_eges_produccion
+
+    relevantes = [p for p in practicas if _codigo(p['fila']['codigo']) in
+                  CODIGOS_COMPLEMENTARIOS | {CODIGO_GUIADO}]
+    candidatos = [{'fila': fila} for fila in componentes_sin_modalidad
+                  if _codigo(fila['codigo']) in CODIGOS_COMPLEMENTARIOS]
+    eges_ids = {p['fila']['id'] for p in relevantes if 'fecha_turno' in p['fila']}
+    eges = {fila.pk: fila for fila in EgesRow.objects.filter(pk__in=eges_ids).only(
+        'pk', 'batch_id', 'historia_clinica', 'fecha_turno', 'hora_turno', 'centro_atencion',
+    )}
+    def sesion(fila):
+        return (fila.batch_id, fila.historia_clinica, fila.fecha_turno,
+                fila.hora_turno, fila.centro_atencion)
+    sesiones_principales = {
+        sesion(eges[p['fila']['id']]) for p in relevantes
+        if 'fecha_turno' in p['fila'] and _codigo(p['fila']['codigo']) == CODIGO_GUIADO
+        and p['fila']['id'] in eges
+    }
+    conservables = set(filas_eges_produccion(EgesRow.objects.filter(pk__in=eges_ids))
+                      .values_list('pk', flat=True))
+    componentes_eges = {pk for pk, fila in eges.items()
+                        if pk not in conservables and sesion(fila) in sesiones_principales}
+
+    def netterm(p):
+        return p.get('netterm') or (p['fila'] if 'fecha_pedido' in p['fila'] else None)
+    netterm_ids = {netterm(p)['id'] for p in relevantes + candidatos if netterm(p)}
+    originales = dict(NettermFila.objects.filter(pk__in=netterm_ids)
+                      .values_list('pk', 'normalizados_json'))
+    def pedido(p):
+        nt = netterm(p)
+        if not nt:
+            return None
+        original = originales.get(nt['id'], {})
+        documento = _texto_normalizado(original.get('documento'))
+        numero = str(original.get('pedido') or '').strip()
+        if not documento or not numero:
+            return None
+        return (_texto_normalizado(original.get('tipo_documento')), documento,
+                numero, nt.get('fecha_realizacion'))
+    principales = defaultdict(set)
+    for p in relevantes:
+        if _codigo(p['fila']['codigo']) == CODIGO_GUIADO and pedido(p):
+            principales[pedido(p)].add(id(p))
+    if resueltos is not None:
+        for p in candidatos:
+            if len(principales.get(pedido(p), ())) == 1:
+                resueltos.add(p['fila']['id'])
+    conservadas, retiradas = [], 0
+    for p in practicas:
+        fila = p['fila']
+        if _codigo(fila['codigo']) in CODIGOS_COMPLEMENTARIOS:
+            componente_eges = 'fecha_turno' in fila and fila['id'] in componentes_eges
+            componente_netterm = len(principales.get(pedido(p), ())) == 1
+            if not fila.get('adicional_independiente') and (componente_eges or componente_netterm):
+                retiradas += 1
+                continue
+        conservadas.append(p)
+    return conservadas, retiradas
+
+
 def completar_decisiones_procedimientos(grupos, excepciones_ids, decisiones):
     if not isinstance(decisiones, dict):
         raise ValidationError('La selección de decisiones no es válida.')

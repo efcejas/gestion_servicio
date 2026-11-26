@@ -7,7 +7,7 @@ from django.utils.dateparse import parse_date
 
 from .models import ConciliacionRevision
 from .services_conciliacion import construir_preview_conciliacion, _texto_normalizado
-from .services_procedimientos import MODALIDADES_GUIADAS
+from .services_procedimientos import MODALIDADES_GUIADAS, agrupar_ecoguiados_provisionales
 from .services_unidades import aplicar_unidades_rx, unidades_practica
 
 
@@ -85,7 +85,9 @@ def construir_preview_produccion(*, incluir_practicas=False, preview_conciliado=
     )
     practicas = {}
     pendientes, excluidos = Counter(), Counter()
+    recepcionados = []
     estados_eges, estados_netterm = Counter(), Counter()
+    componentes_sin_modalidad = []
     revisiones_vincular_consumidas = 0
     revisiones_no_vincular_consumidas = 0
     for caso in preview['resultados']:
@@ -109,6 +111,12 @@ def construir_preview_produccion(*, incluir_practicas=False, preview_conciliado=
             item.update(incluida=True, fuente='EGES', informada=estado == 'INFORMADO')
         else:
             pendientes['eges_realizacion_sin_confirmar'] += 1
+            if estado == 'RECEPCIONADO':
+                recepcionados.append({
+                    'fila_id': fila['id'], 'lote_id': fila['lote_id'],
+                    'practica': fila['practica'], 'fecha_turno': fila['fecha_turno'],
+                    'hora_turno': fila['hora_turno'], 'codigo': fila['codigo'],
+                })
     for caso in preview['resultados']:
         fila = caso['netterm']
         if not fila:
@@ -118,10 +126,13 @@ def construir_preview_produccion(*, incluir_practicas=False, preview_conciliado=
             pendientes['netterm_vigencia'] += 1
         elif fila['anulado']:
             excluidos['netterm_anulado'] += 1
+        elif fila['estado_realizacion'] == 'PENDIENTE' and not fila['fecha_realizacion']:
+            excluidos['netterm_pendiente_realizar_sin_fecha'] += 1
         elif caso['contradiccion_anulacion']:
             pendientes['netterm_anulacion_contradictoria'] += 1
         elif fila['modalidad'] == 'SIN_CLASIFICAR':
             pendientes['netterm_modalidad'] += 1
+            componentes_sin_modalidad.append(fila)
         elif not fila['fecha_realizacion']:
             pendientes['netterm_sin_fecha'] += 1
         elif not realizada_netterm(fila):
@@ -188,9 +199,17 @@ def construir_preview_produccion(*, incluir_practicas=False, preview_conciliado=
             item['procedimiento_guiado_modalidad'] = modalidad_guiada
         incluidos.append(item)
     incluidos = aplicar_unidades_rx(incluidos)
+    componentes_ecoguiados = 0
+    if preview_conciliado is None:
+        resueltos = set()
+        incluidos, componentes_ecoguiados = agrupar_ecoguiados_provisionales(
+            incluidos, componentes_sin_modalidad=componentes_sin_modalidad, resueltos=resueltos,
+        )
+        pendientes['netterm_modalidad'] -= len(resueltos)
     resumen = resumir_practicas_produccion(incluidos)
     resultado = {
-        'version_reglas': 'PRODUCCION_REALIZADA_INFORMADA_V2', 'provisional': True,
+        'version_reglas': 'PRODUCCION_REALIZADA_INFORMADA_V3_ECO', 'provisional': True,
+        'componentes_ecoguiados_agrupados': componentes_ecoguiados,
         'vinculaciones_humanas_consumidas': revisiones_vincular_consumidas,
         'vinculaciones_rechazadas_consumidas': revisiones_no_vincular_consumidas,
         **resumen,
@@ -198,9 +217,14 @@ def construir_preview_produccion(*, incluir_practicas=False, preview_conciliado=
         'pendientes_detalle': [{'motivo': ETIQUETAS_PENDIENTES[k], 'cantidad': v}
                               for k, v in pendientes.items() if v > 0],
         'excluidos': dict(excluidos),
-        'excluidos_detalle': [{'motivo': 'EGES: anuladas' if k == 'eges_anulado' else 'Netterm: anuladas', 'cantidad': v}
+        'excluidos_detalle': [{'motivo': {
+            'eges_anulado': 'EGES: anuladas',
+            'netterm_anulado': 'Netterm: anuladas',
+            'netterm_pendiente_realizar_sin_fecha': 'Netterm: pendientes de realizar sin fecha (fuera del conteo)',
+        }[k], 'cantidad': v}
                              for k, v in excluidos.items()],
         'estados_eges': dict(estados_eges), 'estados_netterm': dict(estados_netterm),
+        'recepcionados_sin_realizacion': recepcionados,
         'insumos_netterm_excluidos': preview['resumen']['insumos_netterm_excluidos'],
         'fecha_desde': desde, 'fecha_hasta': hasta,
         'firma_snapshot': preview['firma_snapshot'],

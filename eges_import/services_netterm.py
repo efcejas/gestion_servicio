@@ -77,6 +77,11 @@ def clasificar_fila_netterm(nombre, codigo, servicio=''):
     nombre_normalizado = _normalizado(nombre)
     practica = EgesRow(practica=_normalizado(nombre))
     modalidad = practica.clasificar_modalidad()
+    if modalidad == 'OTROS' and (
+        str(codigo).split('/')[0] == '900653'
+        or 'ELASTOGRAF' in nombre_normalizado
+    ):
+        modalidad = 'ECO'
     if modalidad == 'OTROS' and any(alias in nombre_normalizado for alias in ('ANGIORESON', 'ANGIO RESON')):
         modalidad = 'RM'
     descripcion_insumo = practica.practica
@@ -97,6 +102,8 @@ def clasificar_fila_netterm(nombre, codigo, servicio=''):
 
 def _modalidad_eco(nombre, codigo):
     nombre_normalizado = _normalizado(nombre)
+    if str(codigo).split('/')[0] == '900653' or 'ELASTOGRAF' in nombre_normalizado:
+        return 'ECO_GENERAL'
     if 'ECOESTRES' in nombre_normalizado.replace(' ', '') or es_estudio_cardiologico('ECO', nombre, codigo):
         return 'ECOCAR'
     if any(patron in nombre_normalizado for patron in ('DOPPLER', 'DUPLEX')):

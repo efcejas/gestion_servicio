@@ -8,6 +8,13 @@ from .models import ConciliacionRevision, ImportBatch, NettermLote
 from .services_conciliacion import MAX_LOTES_NETTERM_CRUCE, ESTADOS_CRUCE
 
 
+CLASE_ARCHIVO_EXCEL = (
+    'block w-full text-sm text-gray-900 dark:text-gray-100 '
+    'bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 '
+    'rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500'
+)
+
+
 class ImportarEGESForm(forms.Form):
     """
     Formulario para subir un archivo Excel EGES.
@@ -18,7 +25,7 @@ class ImportarEGESForm(forms.Form):
         help_text='Suba un archivo .xls o .xlsx exportado desde EGES',
         widget=forms.FileInput(attrs={
             'accept': '.xlsx,.xls',
-            'class': 'block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none'
+            'class': CLASE_ARCHIVO_EXCEL,
         })
     )
 
@@ -88,7 +95,7 @@ class PreviewNettermForm(forms.Form):
         label='Libro Netterm',
         widget=forms.FileInput(attrs={
             'accept': '.xlsx',
-            'class': 'block w-full text-sm text-gray-700 dark:text-gray-200',
+            'class': CLASE_ARCHIVO_EXCEL,
         }),
     )
 
@@ -108,7 +115,7 @@ class PreviewNettermForm(forms.Form):
 class GuardarNettermForm(forms.Form):
     archivo = forms.FileField(
         label='Mismo libro Netterm del preview',
-        widget=forms.FileInput(attrs={'accept': '.xlsx', 'class': 'block w-full text-sm text-gray-700 dark:text-gray-200'}),
+        widget=forms.FileInput(attrs={'accept': '.xlsx', 'class': CLASE_ARCHIVO_EXCEL}),
     )
     preview_token = forms.CharField(widget=forms.HiddenInput())
     motivo = forms.CharField(

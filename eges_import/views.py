@@ -28,6 +28,7 @@ from .services_conciliacion import (
     ESTADOS_CRUCE, construir_preview_conciliacion, registrar_revision_conciliacion,
 )
 from .services_netterm import guardar_lote_netterm
+from .querysets import filas_eges_produccion
 from .services_produccion import construir_preview_produccion
 from .services_estadisticas import construir_estadisticas_fuentes
 from .services_validacion_produccion import (
@@ -41,6 +42,7 @@ from .services import (
     agrupar_periodo as _agrupar_periodo,
     verificar_token as _verificar_token,
     procesar_excel_eges as _procesar_excel_eges,
+    preparar_excel_eges,
     calcular_sha256_archivo as _calcular_sha256_archivo,
 )
 
@@ -468,7 +470,24 @@ def importar_eges(request):
             
             print(f"[EGES] Iniciando importación: {archivo.name} ({archivo.size} bytes)")
             
-            # Crear el batch
+            # No crear un lote hasta conocer las prácticas que pueden guardarse.
+            try:
+                preparacion = preparar_excel_eges(archivo)
+            except Exception:
+                messages.error(request, 'No se pudo analizar el Excel. No se guardaron datos.')
+                return redirect('eges_import:importar')
+            if not preparacion['filas']:
+                messages.warning(
+                    request,
+                    'No hay prácticas nuevas para guardar. '
+                    f"Materiales excluidos: {preparacion['insumos']}. "
+                    f"Duplicadas: {preparacion['duplicadas']}. "
+                    f"Filas con errores: {preparacion['errores']}. "
+                    'No se creó ningún lote ni se guardaron datos.',
+                )
+                return redirect('eges_import:lista_batches')
+
+            # Crear el batch sólo después del análisis.
             batch = ImportBatch.objects.create(
                 usuario=request.user,
                 archivo_nombre=archivo.name,
@@ -480,7 +499,7 @@ def importar_eges(request):
             try:
                 # Procesar el Excel
                 print(f"[EGES] Procesando Excel...")
-                resultado = _procesar_excel_eges(archivo, batch)
+                resultado = _procesar_excel_eges(archivo, batch, preparacion=preparacion)
                 
                 print(f"[EGES] Resultado: {resultado['creadas']} nuevas, {resultado['duplicadas']} duplicadas, {resultado['errores']} errores")
 
@@ -508,12 +527,14 @@ def importar_eges(request):
                         request,
                         f'⚠️ Archivo importado. Se procesaron {resultado["creadas"]} filas nuevas. '
                         f'Se detectaron {resultado["duplicadas"]} filas duplicadas (ya existían en la base de datos). '
+                        f"Materiales excluidos: {preparacion['insumos']}. "
                         f'{resultado["errores"]} filas con errores fueron omitidas.'
                     )
                 else:
                     messages.success(
                         request,
                         f'✓ Archivo importado correctamente. Se procesaron {resultado["creadas"]} filas nuevas. '
+                        f"Materiales excluidos: {preparacion['insumos']}. "
                         f'{resultado["errores"]} filas con errores fueron omitidas.'
                     )
                 
@@ -982,7 +1003,7 @@ def dashboard_global_grafico_data(request):
     modalidades_seleccionadas = request.GET.getlist('modalidades[]')
     
     # Base query: todos los estudios finalizados
-    estudios = EgesRow.objects.filter(
+    estudios = filas_eges_produccion().filter(
         es_insumo=False,
         estado_turno__iexact='Informado',
         fecha_turno__isnull=False
@@ -1399,7 +1420,7 @@ def _exportar_pdf_fuentes(request):
 def _vista_kpis_data(request):
     """Lógica interna de KPIs, reutilizable desde superuser y director."""
     base = _base_estudios_finalizados()
-    candidatos = EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False)
+    candidatos = filas_eges_produccion().filter(fecha_turno__isnull=False)
     sin_informe = _base_rx_sin_informe()
     base = _aplicar_filtros_fecha_modalidad(base, request.GET)
     candidatos = _aplicar_filtros_fecha_modalidad(candidatos, request.GET)
@@ -1906,7 +1927,7 @@ def _datos_comparativa(request):
         params['fecha_hasta'] = hasta.strftime('%Y-%m-%d')
         base = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), params)
         candidatos = _aplicar_filtros_fecha_modalidad(
-            EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False), params
+            filas_eges_produccion().filter(fecha_turno__isnull=False), params
         )
         sin_informe = _aplicar_filtros_fecha_modalidad(_base_rx_sin_informe(), params)
         return _calcular_kpis(base, candidatos, sin_informe)
@@ -2569,7 +2590,7 @@ def _exportar_pdf(request, datos_fuentes=None):
 
     # ── Datos ─────────────────────────────────────────────────────────────────
     base = _base_estudios_finalizados()
-    candidatos = EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False)
+    candidatos = filas_eges_produccion().filter(fecha_turno__isnull=False)
     base_f = _aplicar_filtros_fecha_modalidad(base, request.GET)
     candidatos_f = _aplicar_filtros_fecha_modalidad(candidatos, request.GET)
     sin_informe_f = _aplicar_filtros_fecha_modalidad(_base_rx_sin_informe(), request.GET)
@@ -2603,7 +2624,7 @@ def _exportar_pdf(request, datos_fuentes=None):
         return _calcular_kpis(
             _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), p),
             _aplicar_filtros_fecha_modalidad(
-                EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False), p),
+                filas_eges_produccion().filter(fecha_turno__isnull=False), p),
             _aplicar_filtros_fecha_modalidad(_base_rx_sin_informe(), p),
         )
 

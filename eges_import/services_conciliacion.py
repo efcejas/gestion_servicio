@@ -14,11 +14,42 @@ from .models import ConciliacionRevision, EgesRow, ImportBatch, NettermFila, Net
 from .services_netterm import clasificar_fila_netterm
 
 
-VERSION_CRUCE_NETTERM_EGES = 'DOCUMENTO_NOMBRE_CODIGO_FECHA_PEDIDO_V10'
+VERSION_CRUCE_NETTERM_EGES = 'DOCUMENTO_NOMBRE_CODIGO_FECHA_PEDIDO_V13'
 MAX_LOTES_NETTERM_CRUCE = 10
 MAX_FILAS_CRUCE = 50000
 ESTADOS_CRUCE = ('COINCIDENTE', 'SOLO_EGES', 'SOLO_NETTERM', 'AMBIGUO', 'CONFLICTO')
 MODALIDADES_CONTEO = {'TC', 'RM', 'RX', 'MAM', 'DX', 'SERIE', 'ECO', 'SIN_CLASIFICAR'}
+
+
+def _pendiente_sin_realizacion(fila):
+    datos = fila.normalizados_json
+    return (not fila.anulado and datos.get('estado_realizacion') == 'PENDIENTE'
+            and not fila.fecha_realizacion and not datos.get('hora_realizacion'))
+
+
+def _realizada_definitiva(fila):
+    # Evidencia de realización; el informe se evalúa por separado en producción.
+    return (not fila.anulado and fila.estado_informe in {'DEFINITIVO', 'PENDIENTE', 'NO_DEFINITIVO', 'ESCRITO'}
+            and fila.normalizados_json.get('estado_realizacion') != 'PENDIENTE'
+            and fila.fecha_realizacion and fila.normalizados_json.get('hora_realizacion'))
+
+
+def _observacion_realizada_unica(grupo):
+    """Sólo resuelve una repetición dentro de la misma exportación y pedido."""
+    if len(grupo) < 2 or len({f.lote_id for f in grupo}) != 1:
+        return grupo
+    realizadas = [f for f in grupo if _realizada_definitiva(f)]
+    if len(realizadas) != 1 or not all(
+        f is realizadas[0] or _pendiente_sin_realizacion(f) for f in grupo
+    ):
+        return grupo
+    firmas = {tuple(_texto_normalizado(f.normalizados_json.get(k)) for k in (
+        'pedido', 'tipo_documento', 'documento', 'paciente', 'codigo_nomenclador',
+        'fecha_pedido', 'hora_pedido',
+    )) for f in grupo}
+    if len(firmas) != 1 or not all(next(iter(firmas))):
+        return grupo
+    return realizadas
 
 
 def _texto_normalizado(valor):
@@ -191,6 +222,9 @@ def construir_preview_conciliacion(
     grupos = defaultdict(list)
     for fila in netterm_qs.iterator(chunk_size=500):
         grupos[fila.clave_candidata_sha256].append(fila)
+    grupos_originales = dict(grupos)
+    grupos = {clave: _observacion_realizada_unica(grupo) for clave, grupo in grupos.items()}
+    grupos_resueltos = {clave for clave in grupos if len(grupos[clave]) < len(grupos_originales[clave])}
     grupos_periodo = {}
     cantidad_insumos = 0
     cantidad_netterm = 0
@@ -206,7 +240,7 @@ def construir_preview_conciliacion(
             for fecha in fechas
         ):
             continue
-        cantidad_netterm += len(grupo)
+        cantidad_netterm += len(grupos_originales[clave_grupo])
         normalizados = fila.normalizados_json
         clasificacion = clasificar_fila_netterm(
             normalizados.get('practica'), normalizados.get('codigo_nomenclador'),
@@ -218,7 +252,7 @@ def construir_preview_conciliacion(
         modalidad = _modalidad_consolidada(clasificacion['modalidad'])
         if modalidades is not None and modalidad not in modalidades:
             continue
-        cantidad_netterm_modalidad += len(grupo)
+        cantidad_netterm_modalidad += len(grupos_originales[clave_grupo])
         grupos_periodo[clave_grupo] = grupo
         modalidades_por_grupo[clave_grupo] = modalidad
     grupos = grupos_periodo
@@ -263,10 +297,37 @@ def construir_preview_conciliacion(
             candidatos = []
         else:
             candidatos = indice_eges.get(clave, [])
+            informados = [c for c in candidatos if _texto_normalizado(c.estado_turno) == 'INFORMADO']
+            recepcionados = [c for c in candidatos if _texto_normalizado(c.estado_turno) == 'RECEPCIONADO']
+            # Sólo descartar competidores sin realización si la práctica realizada
+            # tiene una única candidata informada. Nunca reducir dos informados.
+            if (_realizada_definitiva(fila) and len(informados) == 1
+                    and len(candidatos) == len(informados) + len(recepcionados)):
+                candidatos = informados
         candidatos_por_grupo[clave_grupo] = candidatos
         motivos_por_grupo[clave_grupo] = motivos
         for candidata in candidatos:
             grupos_por_eges[candidata.pk].add(clave_grupo)
+    # Un pendiente no compite con un único pedido realizado y definitivo.
+    grupos_pendientes_no_competidores = set()
+    grupos_anulados_no_competidores = set()
+    for candidata_id, claves in grupos_por_eges.items():
+        realizadas = {k for k in claves if len(grupos[k]) == 1 and _realizada_definitiva(grupos[k][0])}
+        pendientes = {k for k in claves if all(_pendiente_sin_realizacion(f) for f in grupos[k])}
+        anulados = set()
+        if len(realizadas) == 1:
+            realizada = grupos[next(iter(realizadas))][0]
+            pedido_realizado = str(realizada.normalizados_json.get('pedido') or '').strip()
+            anulados = {k for k in claves if len(grupos[k]) == 1
+                        and grupos[k][0].anulado and not grupos[k][0].fecha_realizacion
+                        and not grupos[k][0].normalizados_json.get('hora_realizacion')
+                        and pedido_realizado
+                        and str(grupos[k][0].normalizados_json.get('pedido') or '').strip()
+                        and str(grupos[k][0].normalizados_json.get('pedido')).strip() != pedido_realizado}
+        if len(realizadas) == 1 and claves == realizadas | pendientes | anulados:
+            grupos_pendientes_no_competidores.update(pendientes)
+            grupos_anulados_no_competidores.update(anulados)
+            claves.difference_update(pendientes | anulados)
     resultados = []
     for clave_grupo, grupo in grupos.items():
         fila = grupo[0]
@@ -283,7 +344,8 @@ def construir_preview_conciliacion(
         ambiguedad_origen = (
             observaciones_ultimo_lote > 1
             or len({observacion.contenido_sha256 for observacion in grupo}) > 1
-            or any(observacion.clase_observacion == NettermFila.CLASE_AMBIGUA for observacion in grupo)
+            or (clave_grupo not in grupos_resueltos and any(
+                observacion.clase_observacion == NettermFila.CLASE_AMBIGUA for observacion in grupo))
         )
         if ambiguedad_origen or len(candidatas) > 1 or any(len(grupos_por_eges[candidata.pk]) > 1 for candidata in candidatas):
             estado = 'AMBIGUO'
@@ -332,6 +394,12 @@ def construir_preview_conciliacion(
         revision_estado = identidad_coincidente and contradiccion_anulacion
         resultados.append({
             'estado': estado, 'motivos': motivos,
+            'observacion_anulada_no_competidora': clave_grupo in grupos_anulados_no_competidores,
+            'observaciones_pendientes_no_competidoras': [
+                f.pk for f in grupos_originales[clave_grupo]
+                if _pendiente_sin_realizacion(f) and (
+                    clave_grupo in grupos_resueltos or clave_grupo in grupos_pendientes_no_competidores)
+            ],
             'netterm': _datos_netterm(grupo, paciente_clave=documentos_alternativos_verificados.get(clave_grupo)),
             'eges': [_datos_eges(candidata) for candidata in candidatas],
             'advertencias': advertencias,
@@ -365,7 +433,8 @@ def construir_preview_conciliacion(
     return {
         'version_motor': VERSION_CRUCE_NETTERM_EGES,
         'firma_snapshot': _firma_snapshot(
-            batch_id if batch_id else batch_ids, ids, eges, grupos, desde, hasta,
+            batch_id if batch_id else batch_ids, ids, eges,
+            {clave: grupos_originales[clave] for clave in grupos}, desde, hasta,
             modalidades_eges_filtradas, modalidades,
         ),
         'batch_eges_id': batch_id, 'lote_netterm_ids': sorted(ids),

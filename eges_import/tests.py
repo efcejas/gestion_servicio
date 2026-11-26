@@ -12,8 +12,8 @@ from django.urls import reverse
 from openpyxl import Workbook
 
 from .forms import ImportarEGESForm
-from .models import ConciliacionRevision, DirectorToken, EgesRow, ImportBatch, NettermFila, NettermLote
-from .services import calcular_sha256_archivo, procesar_excel_eges
+from .models import ConciliacionRevision, DirectorToken, EgesRow, ImportBatch, NettermFila, NettermLote, NombreObraSocial
+from .services import calcular_sha256_archivo, preparar_excel_eges, procesar_excel_eges
 from .services_netterm import ENCABEZADOS_NETTERM, guardar_lote_netterm, preparar_preview_netterm
 from .services_conciliacion import (
     construir_preview_conciliacion, construir_preview_conteo_consolidado, registrar_revision_conciliacion,
@@ -52,6 +52,17 @@ def _archivo_netterm(filas=None, encabezados=None, nombre_hoja='Netterm'):
 
 
 class PreviewNettermParserTest(SimpleTestCase):
+    def test_elastografia_hepatica_es_ecografia_general(self):
+        r = preparar_preview_netterm(_archivo_netterm([
+            _fila_netterm(**{'0': 'ECOGRAFIA', '2': 'ELASTOGRAFIA HEPATICA', '36': '900653'}),
+        ]))
+        self.assertEqual(r['filas'][0]['modalidad'], 'ECO_GENERAL')
+        self.assertFalse(r['filas'][0]['es_insumo'])
+        from .services_netterm import clasificar_fila_netterm
+        for nombre in ('ELASTOGRAFIA', 'ELASTOGRAFIA TRANSITORIA', 'ELASTOGRAFIA MAMARIA'):
+            self.assertEqual(clasificar_fila_netterm(nombre, '')['modalidad'], 'ECO_GENERAL')
+            self.assertEqual(EgesRow(practica=nombre).clasificar_modalidad(), 'ECO')
+
     def test_tac_con_errata_din_contraste_conserva_la_practica(self):
         resultado = preparar_preview_netterm(_archivo_netterm([
             _fila_netterm(**{'0': 'TOMOGRAFIA', '2': 'TAC CODO DIN CONTRASTE', '36': '901619'}),
@@ -434,6 +445,85 @@ class AlmacenamientoNettermTest(TestCase):
 
 
 class PreviewConciliacionTest(TestCase):
+    def test_recepcionado_no_compite_con_unico_informado(self):
+        self._eges()
+        self._eges(hora_turno=time(8, 30), estado_turno='Recepcionado')
+        r = self._cruzar(self._netterm())
+        caso = next(c for c in r['resultados'] if c['netterm'])
+        self.assertTrue(caso['identidad_coincidente'])
+        self.assertEqual(len(caso['eges']), 1)
+        self.assertEqual(EgesRow.objects.count(), 2)
+
+    def test_realizado_pendiente_informe_no_compite_con_pendiente_realizar(self):
+        self._eges(estado_turno='Fin Práctica')
+        lote = self._netterm([
+            _fila_netterm(**{'1': 'OTRO', '11': None, '12': None, '22': 'PENDIENTE REALIZAR'}),
+            _fila_netterm(**{'22': 'PENDIENTE INFORMAR'}),
+        ])
+        caso = next(c for c in self._cruzar(lote)['resultados'] if c['netterm'] and c['netterm']['fecha_realizacion'])
+        self.assertTrue(caso['identidad_coincidente'])
+
+    def test_pedido_anulado_distinto_sin_realizacion_no_bloquea_realizado(self):
+        lote = self._netterm([
+            _fila_netterm(**{'1': 'ANULADO', '11': None, '12': None, '22': 'ANULADO'}),
+            _fila_netterm(),
+        ])
+        self._eges()
+        r = self._cruzar(lote)
+        realizada = next(c for c in r['resultados'] if c['netterm'] and not c['netterm']['anulado'])
+        self.assertTrue(realizada['identidad_coincidente'])
+        self.assertEqual(lote.filas.count(), 2)
+
+    def test_anulacion_mismo_pedido_conserva_ambiguedad(self):
+        lote = self._netterm([
+            _fila_netterm(**{'11': None, '12': None, '22': 'ANULADO'}), _fila_netterm(),
+        ])
+        self._eges()
+        self.assertEqual(self._cruzar(lote)['resultados'][0]['estado'], 'AMBIGUO')
+
+    def test_pendiente_mismo_pedido_no_impide_realizada_unica(self):
+        lote = self._netterm([
+            _fila_netterm(**{'11': None, '12': None, '22': 'PENDIENTE REALIZAR'}),
+            _fila_netterm(),
+        ])
+        self._eges()
+        r = self._cruzar(lote)
+        casos = [c for c in r['resultados'] if c['netterm']]
+        self.assertEqual(len(casos), 1)
+        self.assertTrue(casos[0]['identidad_coincidente'])
+        self.assertFalse(casos[0]['netterm']['vigencia_incierta'])
+        self.assertEqual(len(casos[0]['observaciones_pendientes_no_competidoras']), 1)
+        self.assertEqual(lote.filas.count(), 2)
+
+    def test_otro_pedido_pendiente_no_compite_con_realizada_unica(self):
+        lote = self._netterm([
+            _fila_netterm(**{'1': 'OTRO', '11': None, '12': None, '22': 'PENDIENTE REALIZAR'}),
+            _fila_netterm(),
+        ])
+        self._eges()
+        r = self._cruzar(lote)
+        realizada = next(c for c in r['resultados'] if c['netterm'] and c['netterm']['fecha_realizacion'])
+        self.assertTrue(realizada['identidad_coincidente'])
+
+    def test_dos_realizadas_siguen_ambiguas_aunque_haya_pendiente(self):
+        lote = self._netterm([
+            _fila_netterm(**{'1': 'PEND', '11': None, '12': None, '22': 'PENDIENTE REALIZAR'}),
+            _fila_netterm(), _fila_netterm(**{'1': 'SEGUNDA'}),
+        ])
+        self._eges()
+        r = self._cruzar(lote)
+        realizadas = [c for c in r['resultados'] if c['netterm'] and c['netterm']['fecha_realizacion']]
+        self.assertTrue(all(c['estado'] == 'AMBIGUO' for c in realizadas))
+
+    def test_versiones_en_lotes_distintos_no_se_resuelven_como_repeticion(self):
+        a = self._netterm([_fila_netterm(**{'11': None, '12': None, '22': 'PENDIENTE REALIZAR'})])
+        b = self._netterm()
+        self._eges()
+        r = self._cruzar(a, b)
+        caso = next(c for c in r['resultados'] if c['netterm'])
+        self.assertTrue(caso['netterm']['vigencia_incierta'])
+        self.assertEqual(caso['estado'], 'AMBIGUO')
+
     def setUp(self):
         self.usuario = get_user_model().objects.create_user(username='cruce_origen_admin', is_superuser=True)
         self.batch = ImportBatch.objects.create(usuario=self.usuario, archivo_nombre='eges_sintetico.xlsx')
@@ -1488,6 +1578,101 @@ def _archivo_practicas_mismo_protocolo_xlsx(practicas):
 class ImportacionEgesAuditoriaPacsTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='admin', password='x')
+
+    def test_preparacion_no_escribe_y_conserva_puncion_ecoguiada(self):
+        archivo = SimpleUploadedFile('preparar.xlsx', _archivo_practicas_mismo_protocolo_xlsx([
+            'PUNCION BIOPSIA BAJO CTROL ECOGRAFICO', 'GUANTES EST.N#7', 'CAMISOLIN',
+        ]))
+        with CaptureQueriesContext(connection) as queries:
+            preparacion = preparar_excel_eges(archivo)
+        self.assertFalse(any(q['sql'].lstrip().upper().startswith(
+            ('INSERT', 'UPDATE', 'DELETE'),
+        ) for q in queries))
+        self.assertEqual(preparacion['insumos'], 2)
+        self.assertEqual(len(preparacion['filas']), 1)
+        self.assertIsNone(preparacion['filas'][0].batch_id)
+        self.assertEqual(ImportBatch.objects.count(), 0)
+        self.assertEqual(EgesRow.objects.count(), 0)
+
+    def test_solo_materiales_no_crea_lote_ni_coberturas(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        self.client.force_login(self.user)
+        libro = Workbook()
+        hoja = libro.active
+        hoja.append(['Dni', 'Paciente', 'Fecha Turno', 'Estado Turno', 'Practica'])
+        for practica in ('GUANTES EST.N#7', 'CAMISOLIN', 'AGUJA P/BIOPSIA BARD MAGNUM'):
+            hoja.append(['12345678', 'PACIENTE FICTICIO', '01/10/2026', 'Informado', practica])
+        contenido = BytesIO()
+        libro.save(contenido)
+        libro.close()
+        archivo = SimpleUploadedFile('materiales.xlsx', contenido.getvalue())
+        with patch.object(ImportBatch.objects, 'create') as crear_lote:
+            response = self.client.post('/eges/importar/', {'archivo': archivo})
+        crear_lote.assert_not_called()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(ImportBatch.objects.count(), 0)
+        self.assertEqual(EgesRow.objects.count(), 0)
+        self.assertEqual(NombreObraSocial.objects.count(), 0)
+        from django.contrib.messages import get_messages
+        texto = ' '.join(str(m) for m in get_messages(response.wsgi_request))
+        self.assertIn('Materiales excluidos: 3', texto)
+
+    def test_puncion_900079_es_principal_no_material(self):
+        from .services_procedimientos import MODALIDADES_GUIADAS, CODIGOS_COMPLEMENTARIOS
+        fila = EgesRow(practica='PUNCION BIOPSIA BAJO CTROL ECOGRAFICO', codigo_practica='900079/0')
+        self.assertFalse(fila.clasificar_insumo())
+        self.assertEqual(MODALIDADES_GUIADAS['900079'], 'ECO')
+        self.assertEqual(CODIGOS_COMPLEMENTARIOS, {'150101', '150111'})
+
+    def test_subtipos_urologicos_no_se_mezclan_con_abdomen_ni_doppler(self):
+        for nombre, esperado in (
+            ('ECOGRAFIA RENAL BILATERAL', 'ECO_RENAL'),
+            ('ECOGRAFIA DE VEJIGA O PROSTATA CON O SIN', 'ECO_VEJIGA_PROSTATA'),
+            ('ECOGRAFIA VESICOPROSTATICA', 'ECO_VEJIGA_PROSTATA'),
+            ('ECOGRAFIA COMPLETA DE ABDOMEN', 'ECO_ABDOMINAL'),
+            ('ECOGRAFIA PANCREATICA O SUPRARRENAL', 'ECO_ABDOMINAL'),
+            ('ECODOPPLER RENAL', 'DOPPLER'),
+            ('ECOGRAFIA PELVIANA TRANSVAGINAL', 'ECO_PELVIS'),
+        ):
+            with self.subTest(nombre=nombre):
+                self.assertEqual(EgesRow(practica=nombre).clasificar_sub_modalidad(), esperado)
+
+    def test_estadisticas_agrupan_ecoguiado_sin_borrar_originales(self):
+        from .querysets import filas_eges_produccion
+        from .services import get_base_estudios_finalizados
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre='procedimientos.xlsx')
+        datos = dict(batch=batch, historia_clinica='HC-1', fecha_turno=date(2026, 10, 1),
+                     hora_turno=time(9), centro_atencion='CENTRO', estado_turno='Informado',
+                     modalidad='ECO', es_insumo=False)
+        def crear(codigo, nombre, **cambios):
+            return EgesRow.objects.create(**{**datos, 'codigo_practica': codigo,
+                                             'practica': nombre, **cambios})
+        principal = crear('900079/0', 'PUNCION BIOPSIA BAJO CTROL.ECOGRAFICO')
+        crear('150101/0', 'BIOPSIA POR INCISION O PUNCION')
+        crear('150111/0', 'CITOLOGIA EXFOLIATIVA DE LIQUIDOS')
+        independiente = crear('180112/0', 'ECOGRAFIA COMPLETA DE ABDOMEN')
+        sin_principal = crear('150101/0', 'BIOPSIA POR INCISION O PUNCION', hora_turno=time(10))
+        otro_paciente = crear('150111', 'CITOLOGIA EXFOLIATIVA DE LIQUIDOS', historia_clinica='HC-2')
+        sin_identidad = crear('150111/0', 'CITOLOGIA EXFOLIATIVA DE LIQUIDOS', historia_clinica='')
+        esperados = [principal.pk, independiente.pk, sin_principal.pk, otro_paciente.pk, sin_identidad.pk]
+        self.assertCountEqual(filas_eges_produccion().values_list('pk', flat=True), esperados)
+        self.assertCountEqual(get_base_estudios_finalizados().values_list('pk', flat=True), esperados)
+        batch.calcular_metricas()
+        self.assertEqual(batch.total_filas, 7)
+        self.assertEqual(batch.total_estudios_candidatos, 5)
+        self.assertEqual(batch.total_estudios_finalizados, 5)
+        self.assertEqual(EgesRow.objects.count(), 7)
+
+    def test_ecoguiado_ambiguo_no_agrupa_automaticamente(self):
+        from .querysets import filas_eges_produccion
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre='ambiguo.xlsx')
+        datos = dict(batch=batch, historia_clinica='HC-1', fecha_turno=date(2026, 10, 1),
+                     hora_turno=time(9), centro_atencion='CENTRO', estado_turno='Informado', es_insumo=False)
+        for codigo, nombre in [('900079', 'PUNCION BAJO CTROL.ECOGRAFICO A'), ('900079/0', 'PUNCION BAJO CTROL.ECOGRAFICO B'),
+                               ('150101/0', 'BIOPSIA POR INCISION O PUNCION')]:
+            EgesRow.objects.create(**datos, codigo_practica=codigo, practica=nombre)
+        self.assertEqual(filas_eges_produccion().count(), 3)
 
     def test_importa_campos_operativos_y_descarta_insumos(self):
         archivo = SimpleUploadedFile(

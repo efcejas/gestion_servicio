@@ -18,6 +18,7 @@ from django.db import transaction
 from django.db.models import Count, Min, Max, Q
 
 from .models import DirectorToken, EgesRow, NombreObraSocial
+from .querysets import filas_eges_produccion
 
 
 NO_ESPECIFICADO = {'medico no especificado', 'médico no especificado', 'no especificado', 'sin especificar', 'none', ''}
@@ -169,9 +170,9 @@ def _celda(row, idx):
     return row[idx]
 
 
-def procesar_excel_eges(archivo, batch):
+def preparar_excel_eges(archivo):
     """
-    Procesa archivos EGES .xls/.xlsx y conserva campos útiles para auditoría PACS.
+    Lee, clasifica y deduplica EGES sin escribir filas, lotes ni coberturas.
 
     Mantiene la regla histórica de no persistir insumos y de deduplicar por
     HC + fecha + hora + centro + práctica. El protocolo no identifica una
@@ -229,6 +230,7 @@ def procesar_excel_eges(archivo, batch):
 
     filas_a_crear = []
     filas_error = 0
+    filas_insumo = 0
     filas_procesadas = 0
     nombres_os_cache = {}
     session_medico = {}
@@ -259,13 +261,7 @@ def procesar_excel_eges(archivo, batch):
             # nombre OS; conservar un valor visible evita perderla en reportes.
             obra_social = (_texto(_celda(row, idx_obra_social)) or nombre_os or codigo_os or None)
 
-            if nombre_os:
-                clave_os = codigo_os or obra_social
-                if clave_os:
-                    nombres_os_cache[clave_os] = nombre_os
-
             fila = EgesRow(
-                batch=batch,
                 numero_turno=_texto(_celda(row, idx_nro_turno)),
                 protocolo=_texto(_celda(row, idx_protocolo)) or None,
                 fecha_turno=fecha_turno,
@@ -303,9 +299,15 @@ def procesar_excel_eges(archivo, batch):
 
             fila.es_insumo = fila.clasificar_insumo()
             if fila.es_insumo:
+                filas_insumo += 1
                 if medico:
                     session_medico.setdefault((hc, fecha_turno, hora_turno, centro), medico)
                 continue
+
+            if nombre_os:
+                clave_os = codigo_os or obra_social
+                if clave_os:
+                    nombres_os_cache[clave_os] = nombre_os
 
             if not fila.medico_informante:
                 fila.medico_informante = session_medico.get((hc, fecha_turno, hora_turno, centro))
@@ -319,9 +321,6 @@ def procesar_excel_eges(archivo, batch):
             print(f"[EGES] Error en fila {row_idx}: {exc}")
 
     print(f"[EGES] Leídas {len(filas_a_crear)} filas válidas, {filas_error} errores.")
-
-    for codigo, nombre in nombres_os_cache.items():
-        NombreObraSocial.objects.update_or_create(codigo=codigo, defaults={'nombre': nombre})
 
     combinaciones_existentes = set(
         EgesRow.objects.values_list(
@@ -345,20 +344,38 @@ def procesar_excel_eges(archivo, batch):
         else:
             filas_duplicadas += 1
 
+    return {
+        'filas': filas_nuevas,
+        'nombres_os': nombres_os_cache,
+        'insumos': filas_insumo,
+        'duplicadas': filas_duplicadas,
+        'errores': filas_error,
+    }
+
+
+def procesar_excel_eges(archivo, batch, *, preparacion=None):
+    """Guarda únicamente las prácticas aceptadas por la preparación previa."""
+    if preparacion is None:
+        preparacion = preparar_excel_eges(archivo)
+    filas_nuevas = preparacion['filas']
     filas_creadas = 0
     if filas_nuevas:
         with transaction.atomic():
+            for codigo, nombre in preparacion['nombres_os'].items():
+                NombreObraSocial.objects.update_or_create(codigo=codigo, defaults={'nombre': nombre})
+            for fila in filas_nuevas:
+                fila.batch = batch
             batch_size = 500
             for i in range(0, len(filas_nuevas), batch_size):
                 lote = filas_nuevas[i:i + batch_size]
                 EgesRow.objects.bulk_create(lote, ignore_conflicts=True)
                 filas_creadas += len(lote)
 
-    print(f"[EGES] Proceso completado: {filas_creadas} nuevas, {filas_duplicadas} duplicadas, {filas_error} errores")
+    print(f"[EGES] Proceso completado: {filas_creadas} nuevas, {preparacion['duplicadas']} duplicadas, {preparacion['errores']} errores")
     return {
         'creadas': filas_creadas,
-        'duplicadas': filas_duplicadas,
-        'errores': filas_error,
+        'duplicadas': preparacion['duplicadas'],
+        'errores': preparacion['errores'],
     }
 
 
@@ -368,7 +385,7 @@ def procesar_excel_eges(archivo, batch):
 
 def get_base_estudios_finalizados():
     """QuerySet base: estudios finalizados (no insumos, estado Informado, con fecha)."""
-    return EgesRow.objects.filter(
+    return filas_eges_produccion().filter(
         es_insumo=False,
         estado_turno__iexact='Informado',
         fecha_turno__isnull=False,
@@ -377,7 +394,7 @@ def get_base_estudios_finalizados():
 
 def get_base_rx_sin_informe():
     """QuerySet base: RX entregados sin informe (cerrados pero sin reporte médico)."""
-    return EgesRow.objects.filter(
+    return filas_eges_produccion().filter(
         es_insumo=False,
         modalidad='RX',
         estado_turno__iexact='Entregado Sin Informe',

@@ -86,7 +86,8 @@ class ImportBatch(models.Model):
         self.total_ingresos_unicos = ingresos_unicos
 
         # Estudios candidatos (no insumos)
-        estudios = filas.filter(es_insumo=False)
+        from .querysets import filas_eges_produccion
+        estudios = filas_eges_produccion(filas)
         self.total_estudios_candidatos = estudios.count()
 
         # Estudios finalizados (Estado = Informado)
@@ -139,6 +140,8 @@ class EgesRow(models.Model):
         ('ECO_OBSTETRICA', 'Ecografía Obstétrica'),
         ('ECO_PELVIS', 'Ecografía Pelviana'),
         ('ECO_ABDOMINAL', 'Ecografía Abdominal'),
+        ('ECO_RENAL', 'Ecografía Renal'),
+        ('ECO_VEJIGA_PROSTATA', 'Ecografía de Vejiga / Próstata'),
         ('ECO_NEONATAL', 'Ecografía Neonatal'),
         ('ECO_PARTES_BLANDAS', 'Ecografía Partes Blandas'),
     ]
@@ -246,7 +249,7 @@ class EgesRow(models.Model):
         if any(kw in texto for kw in ['DENSITOMETR', 'DENSITO', 'OSTEODENSITO', 'DXA ']):
             return 'DX'
         if any(kw in texto for kw in ['ECO', 'ECOGRAF', 'ULTRASON', 'DOPPLER', 'DÚPLEX', 'DUPLEX',
-                                       'ECODOPPLER']):
+                                       'ECODOPPLER', 'ELASTOGRAF']):
             return 'ECO'
         # Seriografía: debe ir ANTES de RX para evitar que caiga en OTROS
         # Cubre: seriógrafos digitales/CR, histerosalpingografías, salpingografías, series digestivas
@@ -294,6 +297,12 @@ class EgesRow(models.Model):
         # 6. DOPPLER genérico (todos los ECODOPPLER vasculares restantes)
         if any(kw in texto for kw in ['DOPPLER', 'DÚPLEX', 'DUPLEX', 'ECODOPPLER']):
             return 'DOPPLER'
+        # Mantener separados los estudios urológicos; suprarrenal sigue en abdomen.
+        import re
+        if any(kw in texto for kw in ['VEJIGA', 'VESICAL', 'PROSTAT', 'PRÓSTAT', 'VESICOPROST']):
+            return 'ECO_VEJIGA_PROSTATA'
+        if re.search(r'\bRENAL(?:ES)?\b|\bRIÑ[OÓ]N(?:ES)?\b', texto):
+            return 'ECO_RENAL'
         # 7. Abdominal / renal / urológica
         if any(kw in texto for kw in ['ABDOMINAL', 'ABDOMEN', 'HÍGADO', 'HIGADO',
                                        'HEPATICA', 'HEPÁTICA', 'RENAL', 'VESICULAR',

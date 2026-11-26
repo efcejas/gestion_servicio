@@ -811,3 +811,161 @@ El commit local y remoto actual es `b159c483`, que contiene únicamente
 basado en `6078e4fb`. El árbol local estaba limpio al verificarlo. No se midió
 esta optimización con el volumen productivo ni se verificó visualmente en Heroku;
 esa medición queda pendiente antes de decidir un despliegue.
+
+## Subtipos urológicos y componentes ecoguiados, pendientes de commit
+
+Desde el último punto documentado quedaron cambios locales sin confirmar que
+separan subtipos ECO y reducen el conteo duplicado de procedimientos guiados.
+`eges_import/models.py` reconoce `ECO_RENAL` y `ECO_VEJIGA_PROSTATA`; una nueva
+migración `0014_subtipos_eco_urologica.py` cambiará las opciones de subtipo y
+reclasificará por texto las filas históricas de abdominales que mencionen riñón,
+vejiga o próstata.
+
+El nuevo queryset `filas_eges_produccion()` conserva todas las filas originales,
+pero excluye de resultados estadísticos los componentes `150101` y `150111` cuando
+existe una punción principal `900079` con el mismo paciente, fecha y hora en EGES.
+Las reglas están compartidas por los puntos de conteo del dashboard y producción.
+Los cambios preparan que una punción principal conserve una unidad y que sus
+componentes no se sumen como prácticas independientes.
+
+Las pruebas locales incluyen clasificación renal/vejiga-próstata, punción principal,
+componentes complementarios y reglas de exclusión por identidad. `makemigrations
+--check --dry-run` no detectó modificaciones pendientes adicionales: la migración
+`0014` sigue como archivo nuevo y no fue aplicada ni desplegada en esta revisión.
+La implementación debe volver a pasar una suite focal y una migración sobre base
+copia antes de comprometerse, porque afecta el subtipo almacenado y el conteo.
+
+Estado al 24/11/2026: estos cambios no tienen commit propio ni publicación. El
+último commit remoto continúa siendo `b159c483`; los archivos locales de este bloque
+requieren revisión, pruebas y decisión de commit por separado. No se modificó
+Heroku ni se aplicó `0014` a una base productiva.
+
+## Estado al 24/11/2026: alerta separada para EGES Recepcionado
+
+Se agregó una alerta diagnóstica en el resultado de producción para las filas EGES
+en estado `Recepcionado`. Esta alerta identifica lote, fila, práctica, código,
+fecha y hora, sin incluir DNI, nombre ni otros datos personales.
+
+La alerta no modifica el conteo ni las reglas de ingreso: las filas Recepcionado
+siguen siendo elegibles solo como pendientes de realización. Netterm definitivo
+puede mantener su aporte cuando corresponde, pero EGES Recepcionado no se cuenta
+como práctica realizada ni sustituye una confirmación Netterm por sí mismo.
+
+Los cambios se hicieron en:
+
+- `eges_import/services_produccion.py`: agrega `recepcionados_sin_realizacion` al
+  resultado sin cambiar totales, cantidad económica, horarios ni vínculos humanos.
+- `eges_import/tests_produccion.py`: mantiene el caso Netterm sustitutivo y agrega
+  una regresión que verifica que el detalle no exponga el DNI.
+- `templates/eges_import/partials/produccion_fuentes.html`: muestra las filas
+  Recepcionado en un desplegable separado dentro de Pendientes de evidencia.
+
+Validación realizada:
+
+- Tres pruebas focales de sustitución Netterm, ambigüedad y Recepcionado pasaron.
+- Dos pruebas de la alerta separada pasaron posteriormente.
+- QA visual sintético mostró 4 filas Recepcionado con lote, fila, código, práctica,
+  fecha y hora, sin DNI visible.
+- La prueba confirmó que el detalle no contiene DNI ni datos personales.
+- `git diff --check` y el diagnóstico de los tres archivos pasaron.
+
+Esta funcionalidad no tiene migraciones, no modifica montos ni liquidaciones y
+no fue publicada en Heroku. Queda pendiente de commit y de prueba visual en el
+entorno desplegado.
+
+## Observación de duplicados Netterm pendiente de implementación
+
+Caso observado: una práctica EGES tiene dos filas Netterm candidatas. Una está
+realizada, con fecha y hora, y la otra está pendiente de realización y carece
+de fecha y hora. La fila pendiente no debe generar una práctica adicional ni
+convertir el caso en una ambigüedad cuando existe una única observación realizada
+inequívoca.
+
+Regla provisional propuesta:
+
+- Priorizar la observación Netterm realizada, definitiva y con fecha/hora.
+- Excluir del conteo y de la ambigüedad la fila pendiente sin fecha/hora.
+- Contar una sola práctica si ambas filas representan la misma identidad,
+  práctica, fecha de realización y modalidad.
+- Conservar ambigüedad únicamente si existen varias observaciones realizadas
+  y no puede determinarse cuál corresponde o si representan actos distintos.
+- No modificar montos, cantidades económicas, horarios ni liquidación con esta
+  regla. Aplicarla primero a producción estadística y al resultado aprobado.
+
+Esta propuesta se implementó localmente el 25/11/2026, con el alcance y las
+limitaciones detalladas en la sección siguiente; todavía no tiene commit propio.
+
+## 25/11/2026: pendientes sin realización que no compiten con un realizado
+
+El motor de conciliación pasa a V11. Un pedido sin fecha ni hora de realización,
+con estado de realización pendiente y no anulado, deja de competir por una fila
+EGES cuando existe una única observación realizada definitiva con fecha y hora.
+Se mantienen las comprobaciones de identidad, código, fecha y modalidad del cruce.
+
+Dentro de una misma clave de pedido se admite seleccionar la única observación
+realizada sólo si las restantes son pendientes sin realización del mismo lote y
+coinciden pedido, documento, tipo documental, nombre, código y fecha/hora de pedido.
+Las versiones divergentes entre exportaciones siguen pendientes. Varias
+observaciones realizadas o una anulación contradictoria conservan su revisión.
+Las observaciones originales permanecen archivadas y participan de la firma del
+snapshot. El resultado identifica las pendientes que no compitieron por el vínculo.
+
+Prueba de lectura sobre los lotes locales EGES 8 y Netterm 4/5, octubre de 2026:
+las correspondencias pendientes bajan de 128 a 41 y la producción permanece en
+4.276 (3.581 EGES + 695 Netterm). Se conservan 154 pendientes de realizar excluidas
+y 62 anuladas excluidas. Pasaron 255 pruebas de eges_import en SQLite de memoria.
+No se modificaron filas, montos, horarios ni registros profesionales de la base
+habitual. No se hizo commit, push ni despliegue de estos cambios.
+
+Corrección del estado documental anterior: la migración 0014 está aplicada en la
+base local (verificado el 25/11); no se verificó su aplicación en producción.
+El HEAD local al iniciar esta revisión era d77587f7; b159c483 es su antecesor.
+
+### V12: pedidos anulados distintos sin realización
+
+Se verificó que un pedido anulado sin fecha/hora de realización podía bloquear
+otro pedido definitivo realizado del mismo paciente, código y fecha. V12 evita
+esa competencia cuando existe un único realizado y los anulados son pedidos
+distintos. La contradicción dentro del mismo pedido o entre versiones no se
+resuelve automáticamente. Los anulados siguen archivados y fuera de producción.
+Con los lotes 8/4/5, las correspondencias pendientes bajan de 41 a 35; la producción
+pasa a 4.277 (3.581 EGES + 696 Netterm) y los EGES sin informe confirmado bajan de
+33 a 32 al obtener respaldo válido. Permanecen excluidas las 62 anuladas y 154
+pendientes sin realización. Pasaron 257 pruebas en memoria. Sin commit ni push.
+
+### 26/11/2026: V13, recibido frente a informado y realización sin informe
+
+El usuario comprobó en Visual un único estudio en Flaque y Warrand, cada uno
+con una candidata EGES informada y otra recepcionada. La candidata recepcionada
+deja de competir cuando existe una única informada del mismo documento, código
+y fecha y Netterm acredita realización con fecha/hora. Se preservan dos informados
+como candidatos ambiguos y todas las filas originales permanecen archivadas.
+
+Para resolver vínculos, una realización con fecha/hora también es evidencia
+cuando el informe sigue pendiente, no definitivo o escrito. No se infiere
+realización de un estado pendiente de realizar ni de una fecha de pedido.
+El filtro del total principal sigue exigiendo informe confirmado; no se modificó
+todavía esa política del conteo. En los lotes 8/4/5 las correspondencias pendientes
+bajan de 35 a 30; el total permanece en 4.277 (3.581 EGES + 696 Netterm).
+
+Verificación manual aportada por el usuario, aún no guardada como decisión de
+producción: Berard tiene una transvaginal del 10/10 en Visual, sin estudio posterior;
+Appello tiene una ecografía de partes blandas del 29/10; Leguizamón tiene mamaria
+y transvaginal del 30/10 reunidas en un único estudio de Visual. La excepción de
+Berard no se generaliza: sus dos pedidos tienen fecha de realización y siguen
+requiriendo resolución manual en la aplicación.
+
+### Punto de pausa solicitado por el usuario
+
+Se guarda el avance en un commit local de feature/eges-netterm, sin push ni
+despliegue. No se incluyen respaldos, bases de datos, archivos de pacientes ni
+el directorio temporal. El último resultado comprobado sigue siendo 4.277
+prácticas provisionales y 30 correspondencias pendientes; no es una aprobación
+definitiva de producción ni una validación económica.
+
+Quedan pendientes: revisar los documentos alternativos y nombres no corroborados,
+resolver las correspondencias múltiples restantes y guardar las decisiones manuales.
+La ampliación adicional de identidad documental no figura implementada en este
+estado del código: no se toma como verificado un descenso a 21 pendientes.
+También falta decidir y probar el conteo separado de realizados sin informe;
+el total principal actual sigue exigiendo informe confirmado.

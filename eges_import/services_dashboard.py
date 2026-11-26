@@ -12,6 +12,7 @@ from .services_produccion import ETIQUETAS_PENDIENTES, realizada_eges, resumir_p
 from .services_procedimientos import MODALIDADES_GUIADAS
 from .services_unidades import aplicar_unidades_rx
 from .services_validacion_produccion import leer_produccion_validada
+from .querysets import filas_eges_produccion
 
 
 def _validacion_del_estudio(validaciones, fecha, modalidad):
@@ -42,7 +43,7 @@ def _base_eges_dashboard(batches, validaciones, cubiertos):
     practicas, afectados = [], set()
     pendientes, excluidos, estados = Counter(), Counter(), Counter()
     firma = hashlib.sha256()
-    filas = EgesRow.objects.filter(batch_id__in=batches, es_insumo=False).only(
+    filas = filas_eges_produccion().filter(batch_id__in=batches).only(
         'pk', 'batch_id', 'dni_paciente', 'codigo_practica', 'fecha_turno',
         'hora_turno', 'estado_turno', 'practica', 'estado_informe', 'modalidad', 'cantidad',
     ).order_by('pk')

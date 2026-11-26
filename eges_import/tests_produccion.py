@@ -117,6 +117,62 @@ class FuentesSinteticasMixin:
 
 
 class ProduccionFuentesTest(FuentesSinteticasMixin, TestCase):
+    def test_pendiente_realizar_sin_fecha_excluye_solo_netterm_sin_retirar_eges(self):
+        self.eges()
+        pendiente = self.netterm(estado='DESCONOCIDO', realizada=False, pendiente_realizar=True)
+        r = construir_preview_produccion(batch_eges_ids=[self.batch.pk], lote_netterm_ids=[self.lote.pk])
+        self.assertEqual(r['total_produccion'], 1)
+        self.assertEqual(r['base_eges'], 1)
+        self.assertEqual(r['aporte_netterm'], 0)
+        self.assertEqual(r['excluidos']['netterm_pendiente_realizar_sin_fecha'], 1)
+        self.assertNotIn('netterm_sin_fecha', r['pendientes'])
+        pendiente.refresh_from_db()
+        self.assertFalse(pendiente.anulado)
+        self.assertIsNone(pendiente.fecha_realizacion)
+
+    def test_provisional_eges_agrupa_ecoguiado_sin_borrar_filas(self):
+        for codigo, nombre in [('900079', 'PUNCION BIOPSIA BAJO CTROL.ECOGRAFICO'),
+                               ('150101', 'BIOPSIA POR INCISION O PUNCION'),
+                               ('150111', 'CITOLOGIA EXFOLIATIVA DE LIQUIDOS')]:
+            self.eges(codigo_practica=codigo, practica=nombre, historia_clinica='HC1',
+                      centro_atencion='CENTRO', servicio='Ecografia', modalidad='ECO')
+        r = construir_preview_produccion(batch_eges_ids=[self.batch.pk], lote_netterm_ids=[self.lote.pk])
+        self.assertEqual(r['total_produccion'], 1)
+        self.assertEqual(r['componentes_ecoguiados_agrupados'], 2)
+        self.assertEqual(self.batch.filas.count(), 3)
+
+    def test_agrupacion_netterm_exige_principal_unica_mismo_pedido(self):
+        from .services_conciliacion import _datos_netterm
+        from .services_procedimientos import agrupar_ecoguiados_provisionales
+        principal = self.netterm(codigo='900079', practica='PUNCION BIOPSIA BAJO CTROL.ECOGRAFICO')
+        componente = self.netterm(codigo='150101', practica='BIOPSIA POR INCISION O PUNCION')
+        otro = self.netterm(pedido='OTRO', codigo='150111', practica='CITOLOGIA EXFOLIATIVA DE LIQUIDOS')
+        items = [{'fila': _datos_netterm([fila])} for fila in (principal, componente, otro)]
+        conservadas, n = agrupar_ecoguiados_provisionales(items)
+        self.assertEqual(n, 1)
+        self.assertEqual([x['fila']['id'] for x in conservadas], [principal.pk, otro.pk])
+        segunda = self.netterm(codigo='900079/0', practica='PUNCION BIOPSIA BAJO CTROL.ECOGRAFICO B')
+        items.append({'fila': _datos_netterm([segunda])})
+        conservadas, n = agrupar_ecoguiados_provisionales(items)
+        self.assertEqual(n, 0)
+        self.assertEqual(len(conservadas), 4)
+
+    def test_componente_sin_modalidad_se_resuelve_solo_con_principal_aceptada(self):
+        from .services_conciliacion import _datos_netterm
+        from .services_procedimientos import agrupar_ecoguiados_provisionales
+        principal = self.netterm(codigo='900079', practica='PUNCION BIOPSIA BAJO CTROL.ECOGRAFICO')
+        componente = self.netterm(codigo='150101', practica='BIOPSIA POR INCISION O PUNCION')
+        otro = self.netterm(pedido='OTRO', codigo='150111', practica='CITOLOGIA EXFOLIATIVA DE LIQUIDOS')
+        resueltos = set()
+        conservadas, n = agrupar_ecoguiados_provisionales(
+            [{'fila': _datos_netterm([principal])}],
+            componentes_sin_modalidad=[_datos_netterm([componente]), _datos_netterm([otro])],
+            resueltos=resueltos,
+        )
+        self.assertEqual(resueltos, {componente.pk})
+        self.assertEqual(len(conservadas), 1)
+        self.assertEqual(n, 0)
+
     def test_contexto_actual_evitar_cargar_filas_originales_completas(self):
         self.eges()
         fila = self.netterm()
@@ -406,6 +462,17 @@ class ProduccionFuentesTest(FuentesSinteticasMixin, TestCase):
         self.assertEqual(resultado['aporte_netterm'], 1)
         self.assertEqual(resultado['pendientes'], {})
         self.assertEqual(resultado['informadas_confirmadas'], 1)
+
+    def test_recepcionado_queda_en_alerta_separada_sin_personalizar_el_pendiente(self):
+        recepcionado = self.eges(estado_turno='Recepcionado')
+        resultado = self.produccion()
+        alertas = resultado['recepcionados_sin_realizacion']
+        self.assertEqual(len(alertas), 1)
+        self.assertEqual(alertas[0]['fila_id'], recepcionado.pk)
+        self.assertEqual(alertas[0]['lote_id'], recepcionado.batch_id)
+        self.assertEqual(alertas[0]['codigo'], recepcionado.codigo_practica)
+        self.assertEqual(alertas[0]['fecha_turno'], recepcionado.fecha_turno)
+        self.assertNotIn(recepcionado.dni_paciente, str(alertas))
 
     def test_internacion_exclusiva_pendiente_de_informe_queda_pendiente(self):
         self.netterm(estado='PENDIENTE')
