@@ -9,11 +9,13 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.utils.dateparse import parse_date, parse_time
 
-from .models import ImportBatch, NettermLote, NettermFila, ProduccionValidada
-from .services_conciliacion import _codigo, construir_preview_conciliacion
+from .models import ImportBatch, NettermLote, NettermFila, ProduccionValidada, EgesRow
+from .services_conciliacion import _codigo, _dni, _datos_eges, construir_preview_conciliacion
 from .services_produccion import construir_preview_produccion, realizada_netterm, resumir_practicas_produccion
 from .services_bilateralidad import detectar_grupos_bilaterales, aplicar_decisiones_bilaterales
 from .services_identificacion import completar_identificacion_practicas
+from .services_evidencia_presentacion import enriquecer_evidencias
+from .services_repeticiones import detectar_repeticiones_eco, completar_decisiones_repeticiones, aplicar_repeticiones
 from .services_procedimientos import (
     detectar_grupos_procedimientos, aplicar_decisiones_procedimientos,
     completar_decisiones_procedimientos,
@@ -49,14 +51,14 @@ def preparar_validacion_produccion(*, batch_eges_ids, lote_netterm_ids, fecha_de
         batch_eges_ids=batch_eges_ids, lote_netterm_ids=lote_netterm_ids,
     )
     firma = hashlib.sha256(json.dumps([
-        preview['firma_snapshot'], str(desde), str(hasta), 'PRODUCCION_REVISION_CLINICA_V7',
+        preview['firma_snapshot'], str(desde), str(hasta), 'PRODUCCION_REVISION_CLINICA_V8',
     ]).encode()).hexdigest()
     excepciones = []
     automaticas = 0
     elegibles = []
     for caso in preview['resultados']:
         fila = caso['netterm']
-        if not fila or not realizada_netterm(fila) or fila['estado'] != 'DEFINITIVO':
+        if not fila or not realizada_netterm(fila):
             continue
         fecha = fila['fecha_realizacion']
         if not fecha or not desde <= fecha <= hasta:
@@ -72,6 +74,27 @@ def preparar_validacion_produccion(*, batch_eges_ids, lote_netterm_ids, fecha_de
     pacientes = dict(NettermFila.objects.filter(
         pk__in=casos,
     ).values_list('pk', 'normalizados_json'))
+    # Ofrecer una candidata para revisión humana de documentos alternativos no
+    # constituye una equivalencia automática de identidad.
+    indice_manual = {}
+    for fila in EgesRow.objects.filter(batch_id__in=preview['batch_eges_ids'], es_insumo=False).only(
+        'pk', 'batch_id', 'dni_paciente', 'codigo_practica', 'fecha_turno', 'hora_turno',
+        'estado_turno', 'estado_informe', 'practica', 'modalidad', 'cantidad', 'apellido_nombre',
+    ):
+        clave = (_dni(fila.dni_paciente), _codigo(fila.codigo_practica), fila.fecha_turno)
+        if all(clave):
+            indice_manual.setdefault(clave, []).append(fila)
+    for item in excepciones:
+        caso = casos[int(item['id'])]
+        origen = pacientes.get(int(item['id']), {})
+        numero = _dni(origen.get('documento'))
+        if not item['candidatas'] and numero and not caso['contradiccion_anulacion']:
+            candidatas = indice_manual.get((numero, _codigo(caso['netterm']['codigo']), caso['netterm']['fecha_pedido']), [])
+            candidatas = [fila for fila in candidatas if fila.estado_turno.upper() not in {'ANULADO', 'CANCELADO'}]
+            if candidatas:
+                caso['eges'] = [{**_datos_eges(fila), 'paciente': fila.apellido_nombre} for fila in candidatas]
+                item['candidatas'] = caso['eges']
+                item['motivos'].append('Candidata sólo para revisión humana por número, código y fecha; corroborá el nombre y la identidad.')
     procedimientos = detectar_grupos_procedimientos(
         [caso['netterm'] for caso in casos.values()], pacientes, casos,
         elegibles_ids={item['id'] for item in elegibles},
@@ -86,12 +109,22 @@ def preparar_validacion_produccion(*, batch_eges_ids, lote_netterm_ids, fecha_de
         origen = pacientes.get(int(item['id']), {})
         item['paciente'] = origen.get('paciente', '')
         item['documento'] = origen.get('documento', '')
+        item['pedido'] = origen.get('pedido', '')
         item['candidatas'] = [{**fila, 'accion': f"VINCULAR:{fila['id']}"} for fila in item['candidatas']]
+    bilaterales = detectar_grupos_bilaterales(elegibles, pacientes)
+    todos = detectar_repeticiones_eco(preview, elegibles, pacientes, desde, hasta, incluir_mmii=True)
+    for grupo in bilaterales:
+        candidata = next((item for item in todos if set(item['filas_ids']) == set(grupo['filas_ids'])), None)
+        if candidata:
+            grupo.update(eges_ids=candidata['eges_ids'], sugerencias=candidata['sugerencias'])
+    repeticiones = detectar_repeticiones_eco(preview, elegibles, pacientes, desde, hasta)
+    enriquecer_evidencias(repeticiones + bilaterales + procedimientos, pacientes, excepciones)
     return {
         'preview': preview, 'firma': firma, 'excepciones': excepciones,
         'automaticas': automaticas, 'fecha_desde': desde, 'fecha_hasta': hasta,
-        'grupos_bilaterales': detectar_grupos_bilaterales(elegibles, pacientes),
+        'grupos_bilaterales': bilaterales,
         'grupos_procedimientos': procedimientos,
+        'grupos_repeticiones': repeticiones,
     }
 
 
@@ -101,8 +134,10 @@ def construir_resultado_validado(preparacion, decisiones):
     excepciones = {item['id']: item for item in preparacion['excepciones']}
     grupos = preparacion.get('grupos_bilaterales', [])
     procedimientos = preparacion.get('grupos_procedimientos', [])
+    repeticiones = preparacion.get('grupos_repeticiones', [])
+    decisiones = completar_decisiones_repeticiones(repeticiones + [g for g in grupos if 'sugerencias' in g], set(excepciones), decisiones)
     decisiones = completar_decisiones_procedimientos(procedimientos, set(excepciones), decisiones)
-    if set(decisiones) != set(excepciones) | {grupo['id'] for grupo in grupos + procedimientos}:
+    if set(decisiones) != set(excepciones) | {grupo['id'] for grupo in grupos + procedimientos + repeticiones}:
         raise ValidationError('Resolvé todas las excepciones antes de confirmar la producción.')
     preview = deepcopy(preparacion['preview'])
     # Conservar la base EGES aunque la decisión sustituya la lista de candidatas.
@@ -155,12 +190,14 @@ def construir_resultado_validado(preparacion, decisiones):
     )
     practicas, auditoria = aplicar_decisiones_bilaterales(resultado['practicas'], grupos, decisiones)
     practicas, auditoria_procedimientos = aplicar_decisiones_procedimientos(practicas, procedimientos, decisiones)
+    practicas, auditoria_repeticiones = aplicar_repeticiones(practicas, repeticiones, decisiones)
     completar_identificacion_practicas(practicas)
     resultado.update(resumir_practicas_produccion(practicas))
     resultado['practicas'] = practicas
     resultado['agrupaciones_bilaterales'] = auditoria
     resultado['agrupaciones_procedimientos'] = auditoria_procedimientos
-    resultado['version_reglas'] = 'PRODUCCION_REVISION_CLINICA_V7'
+    resultado['agrupaciones_repeticiones'] = auditoria_repeticiones
+    resultado['version_reglas'] = 'PRODUCCION_REVISION_CLINICA_V8'
     return resultado
 
 
@@ -175,6 +212,10 @@ def confirmar_produccion(*, usuario, firma_esperada, decisiones, **seleccion):
         raise ValidationError('Las fuentes o los criterios cambiaron. Revisá el análisis actualizado antes de confirmar.')
     decisiones = completar_decisiones_procedimientos(
         preparacion['grupos_procedimientos'], {item['id'] for item in preparacion['excepciones']}, decisiones,
+    )
+    decisiones = completar_decisiones_repeticiones(
+        preparacion.get('grupos_repeticiones', []) + [g for g in preparacion['grupos_bilaterales'] if 'sugerencias' in g],
+        {item['id'] for item in preparacion['excepciones']}, decisiones,
     )
     resultado = construir_resultado_validado(preparacion, decisiones)
     firma = hashlib.sha256(json.dumps([

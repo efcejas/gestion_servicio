@@ -1,4 +1,4 @@
-{% extends "layouts/base_with_sidebar.html" %}
+{% extends "eges_import/base_estadisticas.html" %}
 {% load static %}
 
 {% block title %}Batch #{{ batch.id }} - {{ block.super }}{% endblock %}
@@ -6,7 +6,7 @@
 {% block page_title %}📦 Resumen Batch #{{ batch.id }}{% endblock %}
 {% block page_description %}{{ batch.archivo_nombre }} · Importado el {{ batch.fecha_importacion|date:"d/m/Y" }}{% endblock %}
 
-{% block extra_css %}{% endblock %}
+{% block extra_css %}{{ block.super }}{% endblock %}
 
 {% block page_actions %}
 <a href="{% url 'eges_import:lista_batches' %}" class="text-sm text-gray-300 hover:text-white flex items-center gap-2">
@@ -17,7 +17,8 @@
 </a>
 {% endblock %}
 
-{% block content %}
+{% block estadisticas_content %}
+<header class="estadisticas-cabecera"><div><span class="estadisticas-etiqueta">Paso 1 · Resultado de la carga</span><h1>Archivo EGES cargado</h1><p>{{ batch.archivo_nombre }} · {{ batch.fecha_importacion|date:'d/m/Y' }}</p><p>El siguiente paso es agregar los libros de Netterm del mismo período.</p></div><a class="estadisticas-boton" href="{% url 'eges_import:preview_netterm' %}">Continuar a cargar Netterm</a></header>
 
     <!-- Métricas Generales -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

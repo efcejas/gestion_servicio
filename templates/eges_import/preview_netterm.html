@@ -1,15 +1,13 @@
-{% extends "layouts/base_with_sidebar.html" %}
+{% extends "eges_import/base_estadisticas.html" %}
 
 {% block title %}Cargar Netterm{% endblock %}
 {% block page_title %}Netterm{% endblock %}
 {% block page_description %}Carga del libro y resumen de lectura{% endblock %}
 
-{% block content %}
-    <div class="max-w-full space-y-5 px-4 py-4 sm:px-6 lg:px-10">
-        <a href="{% url 'eges_import:importar' %}" class="text-sm text-gray-300 hover:text-white">Volver a EGES</a>
-        <a href="{% url 'eges_import:lista_lotes_netterm' %}" class="ml-4 text-sm text-gray-300 hover:text-white">Lotes Netterm</a>
-        <h1 class="text-2xl font-bold text-white">Cargar Netterm</h1>
-        <div role="status" class="border-l-4 border-amber-500 p-4 text-sm" style="background-color: #1f2937; color: #fef3c7;">
+{% block estadisticas_content %}
+    <div class="estadisticas-upload space-y-5">
+        <header class="estadisticas-cabecera"><div><span class="estadisticas-etiqueta">Paso 2 · Archivos de origen</span><h1>Cargar Netterm</h1><p>Cargá los libros del mismo período que EGES. Podés agregar eco, Doppler y los demás libros que necesites antes de consolidar.</p></div><a href="{% url 'eges_import:lista_lotes_netterm' %}" class="estadisticas-enlace">Ver libros Netterm cargados</a></header>
+        <div role="status" class="estadisticas-aviso">
             {% if lote_guardado %}
                 {% if lote_creado %}Lote Netterm #{{ lote_guardado.pk }} guardado.{% else %}Este archivo ya corresponde al lote Netterm #{{ lote_guardado.pk }}.{% endif %}
                 Los datos de origen están disponibles para la validación.
@@ -19,18 +17,18 @@
         </div>
         {% if lote_guardado %}
         <div class="flex flex-wrap gap-4">
-            <a href="{% url 'eges_import:preview_netterm' %}" class="rounded border border-gray-500 px-4 py-2 text-white">Cargar otro libro</a>
-            <a href="{% url 'eges_import:validar_produccion' %}" class="rounded bg-teal-700 px-4 py-2 text-white">Ir a validar EGES + Netterm</a>
+            <a href="{% url 'eges_import:preview_netterm' %}" class="estadisticas-boton estadisticas-secundario">Cargar otro libro</a>
+            <a href="{% url 'eges_import:validar_produccion' %}" class="estadisticas-boton">Continuar a consolidar producción</a>
         </div>
         {% endif %}
-        <form method="post" enctype="multipart/form-data" class="space-y-3 border-y border-gray-200 py-4 dark:border-gray-700">
+        <form method="post" enctype="multipart/form-data" class="estadisticas-panel space-y-3">
             {% csrf_token %}
             <input type="hidden" name="accion" value="cargar">
             {% for error in form.non_field_errors %}<p role="alert" class="text-sm text-red-300">{{ error }}</p>{% endfor %}
             <label for="{{ form.archivo.id_for_label }}" class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ form.archivo.label }} (.xlsx)</label>
             {{ form.archivo }}
             {% for error in form.archivo.errors %}<p role="alert" class="text-sm text-red-700 dark:text-red-300">{{ error }}</p>{% endfor %}
-            <button type="submit" class="inline-flex items-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
+            <button type="submit" class="estadisticas-boton">
                 <i class="fas fa-upload" aria-hidden="true"></i> Cargar y analizar libro
             </button>
         </form>

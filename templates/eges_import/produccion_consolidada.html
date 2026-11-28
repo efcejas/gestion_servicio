@@ -1,5 +1,6 @@
-{% extends "layouts/base_with_sidebar.html" %}
+{% extends "eges_import/base_estadisticas.html" %}
 {% block title %}Producción EGES + Netterm{% endblock %}
-{% block content %}
+{% block estadisticas_content %}
+<p class="estadisticas-aviso">Consulta auxiliar: muestra el cálculo automático, sin aplicar las revisiones parciales guardadas. Para revisar y aprobar resultados, usá <a class="estadisticas-enlace" href="{% url 'eges_import:validar_produccion' %}">Consolidar producción</a>.</p>
 {% include "eges_import/partials/produccion_fuentes.html" %}
 {% endblock %}

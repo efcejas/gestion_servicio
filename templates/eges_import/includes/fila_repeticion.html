@@ -1,0 +1,6 @@
+<div class="consol-evidence-row">
+    {% if fila.fuente == 'Netterm' %}<div class="consol-evidence-top"><strong>Pedido {{ fila.pedido|default:'no disponible' }}</strong></div>{% endif %}
+    <p>{{ fila.practica }}</p>
+    {% include 'eges_import/includes/detalle_evidencia.html' with detalle=fila.detalle %}
+    <small>{% if fila.cantidad != None %}Cantidad: {{ fila.cantidad }} · {% endif %}Fila interna #{{ fila.id }}</small>
+</div>

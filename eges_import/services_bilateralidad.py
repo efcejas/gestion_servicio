@@ -64,7 +64,8 @@ def aplicar_decisiones_bilaterales(practicas, grupos, decisiones):
         ids = set(grupo['filas_ids'])
         miembros = [item for item in aceptadas
                     if item.get('netterm', {}).get('id') in ids
-                    or ('fecha_pedido' in item['fila'] and item['fila']['id'] in ids)]
+                    or ('fecha_pedido' in item['fila'] and item['fila']['id'] in ids)
+                    or ('fecha_turno' in item['fila'] and item['fila']['id'] in grupo.get('eges_ids', []))]
         if len(miembros) > 1:
             # EGES conserva su prioridad de respaldo al elegir la fila representativa.
             representante = next((item for item in miembros if item['fuente'] == 'EGES'), miembros[0])

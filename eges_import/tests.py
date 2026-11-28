@@ -265,7 +265,7 @@ class PreviewNettermViewTest(TestCase):
             self.assertEqual(response.context['lote_creado'], intento == 0)
             self.assertEqual(NettermLote.objects.count(), 1)
             self.assertEqual(NettermFila.objects.count(), 1)
-            self.assertContains(response, 'Ir a validar EGES + Netterm')
+            self.assertContains(response, 'Continuar a consolidar producción')
             self.assertNotContains(response, 'Selecciona el mismo libro del preview')
             self.assertNotContains(response, 'name="guardar-archivo"')
             self.assertIsNone(response.context['guardar_form'])

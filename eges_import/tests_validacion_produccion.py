@@ -279,7 +279,9 @@ class ValidacionProduccionTest(FuentesSinteticasMixin, TestCase):
         primera = self.eges()
         self.eges(hora_turno='11:00')
         fila = self.netterm()
-        validacion = self.confirmar({str(fila.pk): {'accion': f'VINCULAR:{primera.pk}', 'modalidad': 'ECO'}})
+        grupo = preparar_validacion_produccion(**self.seleccion())['grupos_repeticiones'][0]['id']
+        validacion = self.confirmar({str(fila.pk): {'accion': f'VINCULAR:{primera.pk}', 'modalidad': 'ECO'},
+                                    grupo: {'accion': 'INDEPENDIENTES'}})
         self.assertEqual(validacion.resultado_json['total_produccion'], 2)
         self.assertEqual(validacion.resultado_json['aporte_netterm'], 0)
 
@@ -288,12 +290,14 @@ class ValidacionProduccionTest(FuentesSinteticasMixin, TestCase):
         self.eges(hora_turno='11:00')
         primera = self.netterm()
         segunda = self.netterm(pedido='2')
+        grupo = preparar_validacion_produccion(**self.seleccion())['grupos_repeticiones'][0]['id']
         validacion = self.confirmar({
             str(primera.pk): {'accion': 'ADICIONAL', 'modalidad': 'ECO'},
             str(segunda.pk): {'accion': 'EXCLUIR'},
+            grupo: {'accion': 'INDEPENDIENTES'},
         })
         self.assertEqual(validacion.resultado_json['total_produccion'], 3)
-        self.assertEqual(len(validacion.decisiones_json), 2)
+        self.assertEqual(len(validacion.decisiones_json), 3)
 
     def test_vinculaciones_competidoras_se_rechazan_atomicamente(self):
         eges = self.eges()

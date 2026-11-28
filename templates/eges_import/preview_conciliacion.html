@@ -1,11 +1,12 @@
-{% extends "layouts/base_with_sidebar.html" %}
+{% extends "eges_import/base_estadisticas.html" %}
 {% block title %}Conciliación EGES - Netterm{% endblock %}
-{% block content %}
+{% block estadisticas_content %}
     <div class="max-w-full space-y-5 px-4 py-4 sm:px-6 lg:px-10">
         <div class="flex flex-wrap items-center justify-between gap-3">
-            <h1 class="text-2xl font-bold text-white">Conciliación EGES - Netterm</h1>
+            <h1 class="text-2xl font-bold text-white">Comparación de registros · diagnóstico</h1>
             <a href="{% url 'eges_import:lista_lotes_netterm' %}" class="text-sm text-gray-300 hover:text-white">Lotes Netterm</a>
         </div>
+        <p class="estadisticas-aviso">Esta consulta es opcional. Para revisar y aprobar los resultados del servicio, usá <a class="estadisticas-enlace" href="{% url 'eges_import:validar_produccion' %}">Consolidar producción</a>.</p>
         {% if messages %}<div class="space-y-2" aria-live="polite">{% for message in messages %}<p role="status" class="border-l-4 {% if message.tags == 'error' %}border-red-500 bg-red-950 text-red-200{% else %}border-teal-500 bg-gray-800 text-gray-100{% endif %} p-3 text-sm">{{ message }}</p>{% endfor %}</div>{% endif %}
         <p role="status" class="border-l-4 border-amber-500 bg-gray-800 p-4 text-sm text-gray-100">El cruce es una vista previa. Las decisiones se guardan como eventos auditables, pero no cambian su resultado, no fusionan estudios, no validan cantidades ni modifican estadísticas o liquidaciones.</p>
         <p class="text-sm text-gray-300">Fechas comparadas: Fecha Turno EGES y Fecha Pedido Netterm. Realización e informe se mantienen como eventos separados. Un lote EGES puede contener sólo filas nuevas de su importación, no el período completo.</p>

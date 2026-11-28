@@ -5,6 +5,21 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 
+class RevisionProduccionParcial(models.Model):
+    """Evento de revisión; no confirma producción ni modifica las fuentes."""
+    firma_fuentes = models.CharField(max_length=64, db_index=True)
+    clave = models.CharField(max_length=100)
+    decision = models.JSONField(default=dict)
+    motivo = models.TextField()
+    revisado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    fecha_revision = models.DateTimeField(default=timezone.now)
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError('Las revisiones guardadas no se modifican; registrá otra revisión.')
+        return super().save(*args, **kwargs)
+
+
 class ProduccionValidada(models.Model):
     """Resultado aprobado y reproducible de una selección de fuentes."""
 

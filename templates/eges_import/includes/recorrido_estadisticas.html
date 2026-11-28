@@ -1,0 +1,10 @@
+{% with actual=request.resolver_match.url_name %}
+<nav class="estadisticas-recorrido" aria-label="Módulos de estadísticas">
+    <a class="estadisticas-inicio {% if actual == 'estadisticas' %}estadisticas-activo{% endif %}" href="{% url 'eges_import:estadisticas' %}" {% if actual == 'estadisticas' %}aria-current="page"{% endif %}><strong>Estadísticas</strong><span>Ver resultados del servicio</span></a>
+    <div class="estadisticas-pasos">
+        <a href="{% url 'eges_import:importar' %}" {% if actual == 'importar' or actual == 'lista_batches' or actual == 'detalle_batch' %}aria-current="page"{% endif %}><b>1</b><span><strong>Cargar EGES</strong><small>Importar los estudios</small></span></a>
+        <a href="{% url 'eges_import:preview_netterm' %}" {% if actual == 'preview_netterm' or actual == 'guardar_netterm' or actual == 'lista_lotes_netterm' %}aria-current="page"{% endif %}><b>2</b><span><strong>Cargar Netterm</strong><small>Agregar sus libros</small></span></a>
+        <a id="validar-produccion-fuentes" href="{% url 'eges_import:validar_produccion' %}" {% if actual == 'validar_produccion' %}aria-current="page"{% endif %}><b>3</b><span><strong>Consolidar producción</strong><small>Revisar, guardar y confirmar</small></span></a>
+    </div>
+</nav>
+{% endwith %}

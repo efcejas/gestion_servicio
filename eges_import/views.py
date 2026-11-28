@@ -28,6 +28,7 @@ from .services_conciliacion import (
     ESTADOS_CRUCE, construir_preview_conciliacion, registrar_revision_conciliacion,
 )
 from .services_netterm import guardar_lote_netterm
+from .services_revision_parcial import decisiones_guardadas, guardar_revision_parcial
 from .querysets import filas_eges_produccion
 from .services_produccion import construir_preview_produccion
 from .services_estadisticas import construir_estadisticas_fuentes
@@ -81,8 +82,20 @@ def validar_produccion(request):
         }
         try:
             preparacion = preparar_validacion_produccion(**seleccion)
+            decisiones = decisiones_guardadas(preparacion)
+            preparacion['decisiones_guardadas'] = decisiones
+            preparacion['cantidad_decisiones_guardadas'] = len(decisiones)
             if request.method == 'POST':
                 decisiones = json.loads(request.POST.get('decisiones_json', '{}'))
+                if request.POST.get('accion') == 'guardar_revision':
+                    cambios = guardar_revision_parcial(
+                        preparacion=preparacion, firma_esperada=request.POST.get('firma', ''),
+                        decisiones=decisiones, usuario=request.user,
+                        motivo=request.POST.get('motivo_revision', ''),
+                    )
+                    return JsonResponse({'guardadas': cambios,
+                        'decisiones_guardadas': decisiones_guardadas(preparacion),
+                        'mensaje': 'Revisión guardada. La producción todavía no está confirmada.'})
                 if request.POST.get('accion') == 'resumen':
                     if preparacion['firma'] != request.POST.get('firma'):
                         raise ValidationError('Las fuentes o los criterios cambiaron. Volvé a analizar la selección.')
@@ -103,7 +116,7 @@ def validar_produccion(request):
                 query['fecha_hasta'] = str(validacion.fecha_hasta)
                 return redirect(f"{reverse('eges_import:estadisticas')}?{query.urlencode()}")
         except (ValidationError, json.JSONDecodeError) as error:
-            if request.method == 'POST' and request.POST.get('accion') == 'resumen':
+            if request.method == 'POST' and request.POST.get('accion') in {'resumen', 'guardar_revision'}:
                 return JsonResponse({'error': error.messages[0] if isinstance(error, ValidationError) else 'Las decisiones no son válidas.'}, status=400)
             form.add_error(None, error.messages if isinstance(error, ValidationError) else 'Las decisiones no son válidas.')
         if preparacion:
@@ -111,7 +124,9 @@ def validar_produccion(request):
                 decision = decisiones.get(item['id'], {}) if isinstance(decisiones, dict) else {}
                 item['accion_seleccionada'] = decision.get('accion', '') if isinstance(decision, dict) else ''
                 item['modalidad_seleccionada'] = decision.get('modalidad', item['modalidad']) if isinstance(decision, dict) else item['modalidad']
-            for grupo in preparacion.get('grupos_bilaterales', []) + preparacion.get('grupos_procedimientos', []):
+            preparacion['sugerencias_repeticiones'] = {grupo['id']: grupo['sugerencias'] for grupo in
+                preparacion.get('grupos_repeticiones', []) + preparacion.get('grupos_bilaterales', []) if 'sugerencias' in grupo}
+            for grupo in preparacion.get('grupos_bilaterales', []) + preparacion.get('grupos_procedimientos', []) + preparacion.get('grupos_repeticiones', []):
                 decision = decisiones.get(grupo['id'], {}) if isinstance(decisiones, dict) else {}
                 grupo['accion_seleccionada'] = decision.get('accion', '') if isinstance(decision, dict) else ''
     return render(request, 'eges_import/validar_produccion.html', {

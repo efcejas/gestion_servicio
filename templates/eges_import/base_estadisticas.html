@@ -1,0 +1,17 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+{% load static %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/eges_estadisticas.css' %}?v=20261127-3">{% endblock %}
+{% block content %}
+<div class="estadisticas-area">
+    {% include 'eges_import/includes/recorrido_estadisticas.html' %}
+    {% block estadisticas_content %}{% endblock %}
+    {% if request.resolver_match.url_name == 'estadisticas' %}
+    <details class="estadisticas-auxiliares">
+        <summary>Diagnóstico de fuentes · opcional</summary>
+        <p>Estas consultas sirven para investigar diferencias. No son pasos necesarios para consolidar ni confirman la producción.</p>
+        <a href="{% url 'eges_import:produccion_consolidada' %}">Ver cálculo automático sin revisiones guardadas</a>
+        <a href="{% url 'eges_import:preview_conciliacion' %}">Comparar registros de origen EGES y Netterm</a>
+    </details>
+    {% endif %}
+</div>
+{% endblock %}

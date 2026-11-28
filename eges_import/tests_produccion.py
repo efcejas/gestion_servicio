@@ -100,11 +100,12 @@ class FuentesSinteticasMixin:
                 estado='DEFINITIVO', realizada=True, documento='12345678', informante='PUENTE CARLOS',
                 pendiente_realizar=False, fecha_realizacion=None, tipo_documento='D.N.I.',
                 modalidad_original='ECO_GENERAL', originales=None, hora_realizacion=None,
-                modalidad_modelo='ECO_GENERAL', fecha_pedido=None, servicio=''):
+                modalidad_modelo='ECO_GENERAL', fecha_pedido=None, servicio='', hora_pedido=None, paciente=''):
         clave = hashlib.sha256(f'{pedido}:1:{codigo}'.encode()).hexdigest()
         normales = dict(pedido=pedido, documento=documento, tipo_documento=tipo_documento, practica=practica,
                         codigo_nomenclador=codigo, tipo_nomenclador='1', informante=informante,
                         hora_realizacion=hora_realizacion,
+                        hora_pedido=hora_pedido, paciente=paciente,
                         servicio=servicio, modalidad=modalidad_original,
                         estado_realizacion='PENDIENTE' if pendiente_realizar else 'CON_FECHA' if realizada else 'DESCONOCIDO')
         return NettermFila.objects.create(

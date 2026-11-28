@@ -1,0 +1,14 @@
+<dl class="consol-eventos">
+    {% if detalle.fuente == 'EGES' %}
+    <div><dt>Turno / ingreso</dt><dd>{{ detalle.fecha_turno|date:'d/m/Y'|default:'Fecha no disponible' }} · {{ detalle.hora_turno|time:'H:i'|default:'Hora no disponible' }}</dd></div>
+    <div><dt>Realización e informe</dt><dd class="consol-evento-ausente">Sin fecha y hora separadas en este Excel.</dd></div>
+    {% else %}
+    <div><dt>Pedido</dt><dd>{{ detalle.fecha_pedido|date:'d/m/Y'|default:'Fecha no disponible' }} · {{ detalle.hora_pedido|time:'H:i'|default:'Hora no disponible' }}</dd></div>
+    <div><dt>Realización</dt><dd>{{ detalle.fecha_realizacion|date:'d/m/Y'|default:'Fecha no disponible' }} · {{ detalle.hora_realizacion|time:'H:i'|default:'Hora no disponible' }}</dd></div>
+    <div><dt>Informe</dt><dd>{{ detalle.fecha_informe|date:'d/m/Y'|default:'Fecha no disponible' }} · {{ detalle.hora_informe|time:'H:i'|default:'Hora no disponible' }}</dd></div>
+    {% endif %}
+    <div><dt>Estado de origen</dt><dd>{{ detalle.estado|default:'No disponible' }}</dd></div>
+    <div><dt>Informante</dt><dd>{{ detalle.profesional|default:'No disponible' }}</dd></div>
+    <div><dt>{% if detalle.fuente == 'EGES' %}Tipo de atención{% else %}Sector{% endif %}</dt><dd>{{ detalle.sector|default:'No disponible' }}</dd></div>
+    <div><dt>Servicio</dt><dd>{{ detalle.servicio|default:'No disponible' }}</dd></div>
+</dl>

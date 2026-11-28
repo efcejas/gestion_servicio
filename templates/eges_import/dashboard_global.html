@@ -1,4 +1,4 @@
-{% extends "layouts/base_with_sidebar.html" %}
+{% extends "eges_import/base_estadisticas.html" %}
 {% load static %}
 
 {% block title %}Estadísticas del servicio - {{ block.super }}{% endblock %}
@@ -6,7 +6,7 @@
 {% block page_title %}📊 Estadísticas de Producción{% endblock %}
 {% block page_description %}Seleccioná las fuentes y lotes para consultar la producción respaldada.{% endblock %}
 
-{% block content %}
+{% block estadisticas_content %}
     <style>
         .dashboard-clock {
             position: relative;
@@ -56,7 +56,7 @@
     <section class="mb-6 rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 md:p-7 text-white shadow-lg">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <h1 class="text-2xl font-bold md:text-3xl">Actividad de Diagnóstico por Imágenes</h1>
+                <h1 class="text-2xl font-bold md:text-3xl">Estadísticas del servicio</h1>
                 <p class="mt-2 max-w-3xl text-sm text-blue-100">
                     Producción respaldada e informes documentados de las fuentes seleccionadas.
                 </p>
@@ -78,61 +78,26 @@
         </div>
         <div class="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-4">
             <div class="space-y-2">
-                <a id="validar-produccion-fuentes" class="inline-flex min-h-10 items-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-50" href="{% url 'eges_import:validar_produccion' %}">Integrar y validar Netterm</a>
+<p class="text-sm text-blue-100">Para actualizar estos resultados: cargá los archivos y elegí «Consolidar producción» en el recorrido superior.</p>
                 {% if validacion_produccion %}<p class="text-xs text-blue-100">Validación registrada el {{ validacion_produccion.fecha_confirmacion|date:'d/m/Y H:i' }}. Los aportes aprobados se aplican a sus períodos y modalidades.</p>{% endif %}
             </div>
             <div class="flex flex-wrap gap-4 text-sm text-blue-100">
-                <a href="{% url 'eges_import:produccion_consolidada' %}" class="underline hover:text-white">Consultar análisis provisional</a>
                 <a href="{% url 'eges_import:lista_batches' %}" class="underline hover:text-white">Lotes importados</a>
             </div>
         </div>
     </section>
 
 
-    <!-- Panel de Filtros -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
-        <div class="mb-3 space-y-2 border-b border-gray-200 pb-3 text-sm text-gray-800 dark:border-gray-700 dark:text-gray-200">
-            <p class="font-semibold">Base EGES completa · {{ total_batches }} lotes cargados</p>
-            <label class="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" id="incluir-netterm-dashboard" {% if netterm_activado %}checked{% endif %} {% if not hay_aportes_netterm %}disabled{% endif %}> Añadir aporte Netterm validado</label>
-            <p id="aporte-netterm-resumen" class="text-xs text-gray-600 dark:text-gray-300" role="status"></p>
-            <ul id="avisos-aporte-netterm" class="space-y-1 text-xs text-amber-700 dark:text-amber-300"></ul>
-            {% if not hay_aportes_netterm %}<p class="text-xs">Importá y validá Netterm para habilitar su aporte.</p>{% endif %}
-            <details><summary class="cursor-pointer text-xs">Ver lotes EGES incluidos</summary><ul class="mt-2 max-h-32 overflow-y-auto text-xs">{% for batch in batches %}<li>{{ batch.archivo_nombre }}</li>{% empty %}<li>Sin lotes EGES.</li>{% endfor %}</ul></details>
-        </div>
-        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Período y modalidades</h2>
-                <p class="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">Todos los indicadores y gráficos responden a esta selección.</p>
-            </div>
-            <div class="flex flex-wrap gap-1.5 sm:gap-2" aria-label="Períodos rápidos">
-                <button type="button" data-periodo="ultimo-cargado" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 dark:border-gray-600 dark:text-gray-200">Último mes cargado</button>
-                <button type="button" data-periodo="tres-meses" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 dark:border-gray-600 dark:text-gray-200">Últimos tres meses cargados</button>
-                <button type="button" data-periodo="mes-actual" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Mes actual</button>
-                <button type="button" data-periodo="mes-anterior" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Mes anterior</button>
-                <button type="button" data-periodo="90-dias" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Últimos 90 días</button>
-                <button type="button" data-periodo="todo" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Todo</button>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] xl:items-end">
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-300">Desde</label>
-                    <input type="date" id="fecha-desde" class="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.75 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                </div>
-
-                <div>
-                    <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-300">Hasta</label>
-                    <input type="date" id="fecha-hasta" class="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.75 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                </div>
-            </div>
-
-            <div>
-                <div class="mb-1 flex items-center justify-between gap-2">
-                    <label class="block text-[11px] font-medium text-gray-700 dark:text-gray-300">Modalidades</label>
-                    <button type="button" id="btn-todas-modalidades" class="text-[11px] font-medium text-medical-primary hover:underline dark:text-blue-300">Todas</button>
-                </div>
-                <div class="flex flex-wrap gap-1.5">
+    <!-- Filtros compactos: conserva los identificadores y eventos del tablero. -->
+    <section class="estadisticas-filtros" aria-label="Filtros de estadísticas">
+        <header class="estadisticas-filtros-header">
+            <div><h2>Filtros</h2><span>Base EGES completa · {{ total_batches }} lotes cargados</span></div>
+            <label class="estadisticas-filtros-netterm"><input type="checkbox" id="incluir-netterm-dashboard" {% if netterm_activado %}checked{% endif %} {% if not hay_aportes_netterm %}disabled{% endif %}> Incluir Netterm consolidado</label>
+        </header>
+        <div class="estadisticas-filtros-controles">
+            <label>Desde<input type="date" id="fecha-desde"></label>
+            <label>Hasta<input type="date" id="fecha-hasta"></label>
+            <fieldset class="estadisticas-filtros-modalidades"><legend>Modalidades <button type="button" id="btn-todas-modalidades">Todas</button></legend><div class="flex flex-wrap gap-1.5">
                     <label class="cursor-pointer">
                         <input type="checkbox" value="TC" class="modalidad-check peer sr-only" checked>
                         <span class="flex min-w-[42px] justify-center rounded-full border border-gray-300 px-2 py-1.5 text-[11px] font-semibold text-gray-600 transition peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-checked:text-white dark:border-gray-600 dark:text-gray-300">TC</span>
@@ -161,35 +126,18 @@
                         <input type="checkbox" value="SERIE" class="modalidad-check peer sr-only" checked>
                         <span class="flex min-w-[42px] justify-center rounded-full border border-gray-300 px-2 py-1.5 text-[11px] font-semibold text-gray-600 transition peer-checked:border-teal-600 peer-checked:bg-teal-600 peer-checked:text-white dark:border-gray-600 dark:text-gray-300">SER</span>
                     </label>
-                </div>
-            </div>
+                </div></fieldset>
+            <div class="estadisticas-filtros-acciones"><button type="button" id="btn-aplicar-filtros">Aplicar</button><button type="button" id="btn-limpiar-filtros">Limpiar</button><a id="btn-exportar-pdf" href="{% url 'eges_import:exportar_pdf_fuentes' %}" target="_blank" rel="noopener">Descargar PDF</a></div>
         </div>
-        
-        <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-700">
-            <button id="btn-aplicar-filtros" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
-                </svg>
-                Aplicar
-            </button>
-            <button id="btn-limpiar-filtros" class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg transition-colors text-sm">
-                Limpiar
-            </button>
-            {# Botón exportar Excel oculto hasta definir los datos a exportar #}
-            {# <button id="btn-exportar-excel" ...>Exportar Excel</button> #}
-            <a id="btn-exportar-pdf"
-                    href="{% url 'eges_import:exportar_pdf_fuentes' %}"
-               class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm no-underline"
-               target="_blank">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Descargar PDF
-            </a>
-            <p id="filtro-resumen" class="w-full text-xs text-gray-500 dark:text-gray-400 sm:ml-auto sm:w-auto"></p>
+        <div class="estadisticas-filtros-accesos" aria-label="Períodos rápidos">
+            <button type="button" data-periodo="ultimo-cargado" class="periodo-rapido">Último mes cargado</button>
+            <button type="button" data-periodo="tres-meses" class="periodo-rapido">Últimos tres meses cargados</button>
+            <button type="button" data-periodo="todo" class="periodo-rapido">Todo</button>
+            <details class="estadisticas-filtros-mas"><summary>Más períodos</summary><div><button type="button" data-periodo="mes-actual" class="periodo-rapido">Mes actual</button><button type="button" data-periodo="mes-anterior" class="periodo-rapido">Mes anterior</button><button type="button" data-periodo="90-dias" class="periodo-rapido">Últimos 90 días</button></div></details>
+            <details class="estadisticas-filtros-mas"><summary>Ver fuentes y archivos</summary><div><p>EGES incluye todos los archivos cargados. Los indicadores y gráficos responden al período y modalidades seleccionados.</p><ul>{% for batch in batches %}<li>{{ batch.archivo_nombre }}</li>{% empty %}<li>Sin lotes EGES.</li>{% endfor %}</ul>{% if not hay_aportes_netterm %}<p>Cargá y consolidá Netterm para habilitar su aporte.</p>{% endif %}</div></details>
         </div>
-    </div>
+        <div class="estadisticas-filtros-estado"><p id="filtro-resumen"></p><p id="aporte-netterm-resumen" role="status"></p><ul id="avisos-aporte-netterm"></ul></div>
+    </section>
 
     <div id="carga-dashboard" role="dialog" aria-modal="true" aria-labelledby="titulo-carga-dashboard" hidden
          class="fixed inset-0" style="z-index: 10000; background: rgba(15, 23, 42, 0.48); backdrop-filter: blur(4px);">
@@ -376,18 +324,18 @@
             <div id="comp-sin-actividad" class="hidden mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                 Sin evidencia comparable en el período anterior
             </div>
-            <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+            <div class="estadisticas-comparativa-metricas p-4">
+                <div class="estadisticas-comparativa-metrica text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                     <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Pacientes</p>
                     <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-pacientes-valores">—</p>
                     <p class="text-xs mt-1 text-gray-400" id="comp-pacientes-delta">cargando…</p>
                 </div>
-                <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                <div class="estadisticas-comparativa-metrica text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                     <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Prácticas</p>
                     <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-practicas-valores">—</p>
                     <p class="text-xs mt-1 text-gray-400" id="comp-practicas-delta">cargando…</p>
                 </div>
-                <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                <div class="estadisticas-comparativa-metrica text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
                     <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Prácticas / paciente identificado</p>
                     <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-practicas-paciente-valores">—</p>
                     <p class="text-xs mt-1 text-gray-400" id="comp-practicas-paciente-delta">cargando…</p>

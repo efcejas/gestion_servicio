@@ -1,4 +1,4 @@
-{% extends "layouts/base_with_sidebar.html" %}
+{% extends "eges_import/base_estadisticas.html" %}
 {% load static %}
 
 {% block title %}Importación EGES - {{ block.super }}{% endblock %}
@@ -6,7 +6,7 @@
 {% block page_title %}📊 Importación EGES{% endblock %}
 {% block page_description %}Sistema de estadísticas hospitalarias{% endblock %}
 
-{% block extra_css %}{% endblock %}
+{% block extra_css %}{{ block.super }}{% endblock %}
 
 {% block breadcrumb %}
 <nav class="flex mb-4" aria-label="Breadcrumb">
@@ -44,7 +44,8 @@
 </div>
 {% endblock %}
 
-{% block content %}
+{% block estadisticas_content %}
+<header class="estadisticas-cabecera"><div><span class="estadisticas-etiqueta">Archivos de origen · EGES</span><h1>Archivos EGES cargados</h1><p>Consultá el resultado de cada importación o agregá el archivo del próximo período.</p></div><a class="estadisticas-boton" href="{% url 'eges_import:importar' %}">Cargar EGES</a></header>
 
     <!-- Messages -->
     {% if messages %}

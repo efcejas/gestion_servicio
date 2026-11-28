@@ -1,24 +1,30 @@
-{% extends 'layouts/base_with_sidebar.html' %}
+{% extends 'eges_import/base_estadisticas.html' %}
+{% load static %}
+{% block extra_css %}{{ block.super }}<link rel="stylesheet" href="{% static 'css/eges_consolidacion.css' %}?v=20261127-4">{% endblock %}
 {% block title %}Validar producción EGES + Netterm{% endblock %}
-{% block content %}
-<div class="mx-auto max-w-7xl space-y-5 p-4 text-gray-200">
-    <h1 class="text-2xl font-bold">Validar producción EGES + Netterm</h1>
-    <p>Seleccioná el período y sus archivos. Las correspondencias claras se resuelven automáticamente.</p>
-    <details class="rounded border border-gray-600 p-4" {% if not preparacion %}open{% endif %}>
+{% block estadisticas_content %}
+<div class="consol mx-auto max-w-7xl space-y-5 p-4 text-gray-200">
+    <header class="consol-header">
+        <div><p class="consol-eyebrow">EGES + Netterm · Productividad</p><h1>Consolidar producción</h1><p>Reuní las fuentes, revisá sólo las dudas y confirmá los resultados.</p></div>
+        <span class="consol-phase">{% if preparacion %}Revisión en curso{% else %}Elegí los archivos{% endif %}</span>
+    </header>
+
+    <details class="consol-selection rounded border border-gray-600 p-4" {% if not preparacion %}open{% endif %}>
     <summary class="cursor-pointer font-semibold">Archivos y período{% if preparacion %} · {{ preparacion.fecha_desde|date:'d/m/Y' }} al {{ preparacion.fecha_hasta|date:'d/m/Y' }}{% endif %}</summary>
     <form method="get" class="mt-4 space-y-4">
         {{ form.non_field_errors }}
         <div class="grid gap-4 sm:grid-cols-2">
             <div><label for="{{ form.fecha_desde.id_for_label }}">Desde</label>{{ form.fecha_desde }}{{ form.fecha_desde.errors }}</div>
             <div><label for="{{ form.fecha_hasta.id_for_label }}">Hasta</label>{{ form.fecha_hasta }}{{ form.fecha_hasta.errors }}</div>
-            <fieldset class="max-h-64 overflow-auto"><legend>Lotes EGES</legend>{{ form.lotes_eges }}{{ form.lotes_eges.errors }}</fieldset>
-            <fieldset class="max-h-64 overflow-auto"><legend>Lotes Netterm</legend>{{ form.lotes_netterm }}{{ form.lotes_netterm.errors }}</fieldset>
+            <fieldset class="consol-files max-h-64 overflow-auto"><legend><span class="consol-source consol-source-eges">EGES</span> Archivos importados</legend>{{ form.lotes_eges }}{{ form.lotes_eges.errors }}{% if not form.fields.lotes_eges.queryset %}<p>Primero <a class="estadisticas-enlace" href="{% url 'eges_import:importar' %}">cargá un Excel de EGES</a>.</p>{% endif %}</fieldset>
+            <fieldset class="consol-files max-h-64 overflow-auto"><legend><span class="consol-source consol-source-netterm">Netterm</span> Libros importados</legend>{{ form.lotes_netterm }}{{ form.lotes_netterm.errors }}{% if not form.fields.lotes_netterm.queryset %}<p>Primero <a class="estadisticas-enlace" href="{% url 'eges_import:preview_netterm' %}">cargá los libros de Netterm</a>.</p>{% endif %}</fieldset>
         </div>
         <button class="rounded bg-teal-700 px-4 py-2" type="submit">Analizar selección</button>
     </form>
     </details>
     {% if preparacion %}
-    <p class="rounded bg-gray-800 p-4">{{ preparacion.automaticas }} casos Netterm resueltos automáticamente. <span id="total-excepciones-visibles">{{ preparacion.excepciones|length }}</span> filas en revisión individual. <span id="resueltas-por-grupo" hidden></span></p>
+    {% if preparacion.cantidad_decisiones_guardadas %}<p class="rounded border border-teal-700 p-3">Se recuperaron {{ preparacion.cantidad_decisiones_guardadas }} decisiones guardadas. Ya están seleccionadas; continuá con las pendientes. La producción definitiva aún requiere confirmación.</p>{% endif %}
+    <p class="consol-auto"><strong>{{ preparacion.automaticas }}</strong> registros Netterm con correspondencia resuelta automáticamente. <span id="total-excepciones-visibles">{{ preparacion.excepciones|length }}</span> filas para revisión individual. <span id="resueltas-por-grupo" hidden></span><br><small>Estos valores describen la revisión; no son el total de pacientes ni de prácticas.</small></p>
     <form method="post" id="confirmar-produccion" class="space-y-4">
         {% csrf_token %}
         {% for id in preparacion.preview.batch_eges_ids %}<input type="hidden" name="lotes_eges" value="{{ id }}">{% endfor %}
@@ -27,16 +33,59 @@
         <input type="hidden" name="fecha_hasta" value="{{ preparacion.fecha_hasta|date:'Y-m-d' }}">
         <input type="hidden" name="firma" value="{{ preparacion.firma }}">
         <input type="hidden" name="decisiones_json" id="decisiones-produccion" value="{}">
-        <nav aria-label="Etapas de validación" id="etapas-validacion" class="flex flex-wrap gap-2">
+        {{ preparacion.decisiones_guardadas|json_script:'revisiones-guardadas' }}
+        <div class="consol-overview">
+            <div class="consol-metrics" aria-label="Estado de la revisión">
+                <div><span id="contador-pendientes">—</span><small>Por resolver</small></div>
+                <div><span id="contador-sin-guardar">—</span><small>Cambios sin guardar</small></div>
+                <div><span id="contador-guardadas">—</span><small>Revisiones guardadas</small></div>
+            </div>
+            <div class="consol-progress"><p id="texto-progreso">Preparando revisión…</p><progress id="progreso-revision" value="0" max="1" aria-label="Avance de decisiones"></progress></div>
+        </div>
+        <nav aria-label="Etapas de validación" id="etapas-validacion" class="consol-stages flex flex-wrap gap-2">
             {% if preparacion.grupos_bilaterales %}<button type="button" data-ir-etapa="doppler" class="rounded border border-gray-500 px-3 py-2">Doppler bilateral</button>{% endif %}
             {% if preparacion.grupos_procedimientos %}<button type="button" data-ir-etapa="procedimientos" class="rounded border border-gray-500 px-3 py-2">Procedimientos guiados</button>{% endif %}
+            {% if preparacion.grupos_repeticiones %}<button type="button" data-ir-etapa="repeticiones" class="rounded border border-gray-500 px-3 py-2">Posibles repeticiones de ecografía</button>{% endif %}
             {% if preparacion.excepciones %}<button type="button" data-ir-etapa="excepciones" class="rounded border border-gray-500 px-3 py-2">Dudas restantes</button>{% endif %}
             <button type="button" data-ir-etapa="resumen" class="rounded border border-gray-500 px-3 py-2">Resumen y confirmación</button>
         </nav>
+        <div class="consol-toolbar" id="herramientas-revision">
+            <label>Buscar en esta etapa<input id="buscar-revision" type="search" placeholder="Paciente, documento o pedido" autocomplete="off"></label>
+            <label>Mostrar<select id="filtro-revision"><option value="pendientes">Por revisar y guardar</option><option value="todas">Todas las revisiones</option><option value="guardadas">Sólo guardadas</option><option value="sin_guardar">Sólo cambios sin guardar</option></select></label>
+            <p id="coincidencias-revision" role="status" aria-live="polite"></p>
+        </div>
+        <p id="revision-sin-coincidencias" class="consol-empty" hidden>No hay casos que coincidan en esta etapa. Cambiá la búsqueda o elegí «Todas las revisiones» para ver las guardadas.</p>
+        {{ preparacion.sugerencias_repeticiones|json_script:'sugerencias-repeticiones' }}
+        {% if preparacion.grupos_repeticiones %}
+        <section data-paso-revision="repeticiones" class="space-y-3 rounded border border-amber-600 p-4">
+            <h2 class="text-lg font-semibold">Posibles repeticiones de ecografía</h2>
+            <p>Compartir paciente, fecha y código no demuestra duplicación. Contrastá los informes o Visual. No se elimina ningún registro original ni se modifican pagos.</p>
+            {% for grupo in preparacion.grupos_repeticiones %}
+            <div class="space-y-2 border-t border-gray-700 py-3" data-grupo-repeticion="{{ grupo.id }}" data-miembros="{{ grupo.filas_ids|join:',' }}">
+                <div class="consol-case-heading">
+                    <div><p class="font-semibold">{{ grupo.paciente }} · {{ grupo.documento }}</p><p class="consol-case-subtitle">{{ grupo.fecha|date:'d/m/Y' }} · {{ grupo.practica }}</p></div>
+                    <span data-estado-guardado class="inline-block rounded border px-2 py-1 text-sm" role="status"></span>
+                </div>
+                <div class="consol-evidence">
+                    <div class="consol-evidence-eges"><h3><span class="consol-source consol-source-eges">EGES</span> {{ grupo.eges_ids|length }} registro{{ grupo.eges_ids|length|pluralize }}</h3>
+                        {% for fila in grupo.filas %}{% if fila.fuente == 'EGES' %}{% include 'eges_import/includes/fila_repeticion.html' %}{% endif %}{% endfor %}
+                        {% if not grupo.eges_ids %}<p class="consol-evidence-empty">Sin fila EGES asociada a este grupo.</p>{% endif %}
+                    </div>
+                    <div class="consol-evidence-netterm"><h3><span class="consol-source consol-source-netterm">Netterm</span> {{ grupo.filas_ids|length }} registro{{ grupo.filas_ids|length|pluralize }}</h3>
+                        {% for fila in grupo.filas %}{% if fila.fuente == 'Netterm' %}{% include 'eges_import/includes/fila_repeticion.html' %}{% endif %}{% endfor %}
+                        {% if not grupo.filas_ids %}<p class="consol-evidence-empty">Sin fila Netterm asociada a este grupo.</p>{% endif %}
+                    </div>
+                </div>
+                <div class="consol-case-decision"><label>Cómo se contabiliza <select data-decision-bilateral class="rounded bg-gray-800 p-2" aria-describedby="resultado-{{ grupo.id }}"><option value="">Pendiente de revisión</option><option value="UNICO" {% if grupo.accion_seleccionada == 'UNICO' %}selected{% endif %}>Carga duplicada: una práctica</option><option value="INDEPENDIENTES" {% if grupo.accion_seleccionada == 'INDEPENDIENTES' %}selected{% endif %}>Realizaciones independientes: conservar prácticas</option></select></label><p data-resultado-grupo id="resultado-{{ grupo.id }}">Elegí cómo contabilizar este grupo. Se conservan todos los registros originales.</p></div>
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
         {% if preparacion.excepciones %}
         <section data-paso-revision="excepciones" class="space-y-4">
         <h2 class="text-lg font-semibold">Dudas restantes</h2>
         <p>En cada excepción indicá si es la misma práctica de EGES, una práctica adicional o si se excluye del aporte. Para una adicional confirmás que corresponde a otro estudio.</p>
+        <details class="consol-bulk"><summary>Acciones para varios casos seleccionados</summary>
         <div class="flex flex-wrap items-center gap-3 rounded border border-gray-600 p-3">
             <label><input type="checkbox" id="seleccionar-excepciones"> Seleccionar todas las excepciones</label>
             <label for="accion-conjunto">Acción conjunta</label>
@@ -48,6 +97,7 @@
             </select>
             <button type="button" id="aplicar-conjunto" class="rounded bg-gray-700 px-3 py-2">Aplicar a seleccionadas</button>
         </div>
+        </details>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
                 <thead><tr><th class="p-2">Seleccionar</th><th class="p-2">Paciente y práctica Netterm</th><th class="p-2">Decisión</th><th class="p-2">Modalidad</th></tr></thead>
@@ -55,14 +105,23 @@
                 {% for caso in preparacion.excepciones %}
                 <tr data-excepcion="{{ caso.id }}" class="border-t border-gray-700">
                     <td class="p-2"><input type="checkbox" data-seleccionar aria-label="Seleccionar práctica {{ caso.practica }}"></td>
-                    <td class="p-2"><p>{{ caso.paciente }} · {{ caso.documento }}</p><p class="font-semibold">{{ caso.practica }}</p><p>{{ caso.fecha|date:'d/m/Y' }}</p>{% for motivo in caso.motivos %}<p class="text-xs text-gray-400">{{ motivo }}</p>{% endfor %}{% if caso.vigencia_incierta %}<p class="text-amber-300">Versiones divergentes. Elegí fuentes consistentes o excluí esta observación.</p>{% endif %}</td>
+                    <td class="p-2">
+                        <p class="mb-2"><span class="consol-source consol-source-netterm">Netterm</span> <span class="font-semibold">Pedido {{ caso.pedido|default:'no disponible' }}</span></p>
+                        <p>{{ caso.paciente }} · {{ caso.documento }}</p><p class="font-semibold">{{ caso.practica }}</p><p>{{ caso.fecha|date:'d/m/Y' }}</p>
+                        <p class="text-xs text-gray-400">Nombre y documento tomados de Netterm · Fila interna #{{ caso.id }}</p>
+                        <details class="consol-evidence-details"><summary>Fechas, informante y sector de Netterm</summary>{% include 'eges_import/includes/detalle_evidencia.html' with detalle=caso.detalle %}</details>
+                        {% if caso.candidatas %}<details class="consol-evidence-details"><summary>Datos de las candidatas EGES</summary>{% for candidata in caso.candidatas %}<p>EGES · Fila #{{ candidata.id }} · {{ candidata.practica }}</p>{% include 'eges_import/includes/detalle_evidencia.html' with detalle=candidata.detalle %}{% endfor %}</details>{% endif %}
+                        {% if caso.candidatas %}<p class="mt-1 text-sm text-sky-300">Hay candidatas EGES: revisalas en «Misma práctica EGES».</p>{% else %}<p class="mt-1 text-sm text-gray-400">Sin candidata EGES identificada en esta selección.</p>{% endif %}
+                        {% for motivo in caso.motivos %}<p class="text-xs text-gray-400">{{ motivo }}</p>{% endfor %}{% if caso.vigencia_incierta %}<p class="text-amber-300">Versiones divergentes. Elegí fuentes consistentes o excluí esta observación.</p>{% endif %}
+                    </td>
                     <td class="p-2">
                         <select data-accion class="w-full min-w-52 rounded bg-gray-800 p-2" aria-label="Decisión para {{ caso.practica }}">
                             <option value="">Pendiente de decisión</option>
-                            {% for candidata in caso.candidatas %}<option value="{{ candidata.accion }}" {% if caso.accion_seleccionada == candidata.accion %}selected{% endif %}>Misma práctica EGES #{{ candidata.id }} · {{ candidata.practica }} · {{ candidata.fecha_turno|date:'d/m/Y' }}</option>{% endfor %}
+                            {% for candidata in caso.candidatas %}<option value="{{ candidata.accion }}" {% if caso.accion_seleccionada == candidata.accion %}selected{% endif %}>Misma práctica EGES #{{ candidata.id }} · {% if candidata.paciente %}{{ candidata.paciente }} · {% endif %}{{ candidata.practica }} · {{ candidata.fecha_turno|date:'d/m/Y' }}</option>{% endfor %}
                             <option value="ADICIONAL" {% if caso.accion_seleccionada == 'ADICIONAL' %}selected{% endif %}>Práctica adicional independiente</option>
                             <option value="EXCLUIR" {% if caso.accion_seleccionada == 'EXCLUIR' %}selected{% endif %}>Excluir del aporte Netterm</option>
                         </select>
+                        <span data-estado-guardado class="mt-1 inline-block rounded border px-2 py-1 text-sm" role="status"></span>
                     </td>
                     <td class="p-2"><select data-modalidad class="rounded bg-gray-800 p-2" aria-label="Modalidad para {{ caso.practica }}"><option value="">Elegir modalidad</option>{% for modalidad in modalidades %}<option value="{{ modalidad }}" {% if modalidad == caso.modalidad_seleccionada %}selected{% endif %}>{{ modalidad }}</option>{% endfor %}</select></td>
                 </tr>
@@ -76,16 +135,20 @@
         <section data-paso-revision="doppler" class="space-y-3 rounded border border-amber-600 p-4">
             <h2 class="text-lg font-semibold">Revisar Doppler de miembros inferiores</h2>
             <p>Un Doppler venoso unilateral o bilateral cuenta una práctica. El arterial cuenta otra. Estos grupos comparten paciente, fecha de realización y modalidad vascular. Confirmá si representan un único estudio o estudios independientes.</p>
+            <details class="consol-bulk"><summary>Aplicar una decisión a todos estos grupos</summary>
+            <p>Usá esta opción sólo si comprobaste que la misma decisión corresponde a cada grupo.</p>
             <div class="flex flex-wrap items-center gap-3">
                 <label for="accion-bilateral-conjunto">Acción para todos estos grupos</label>
                 <select id="accion-bilateral-conjunto" class="rounded bg-gray-800 p-2"><option value="">Elegir</option><option value="UNICO">Un estudio por grupo</option><option value="INDEPENDIENTES">Estudios independientes</option></select>
                 <button type="button" id="aplicar-bilateral-conjunto" class="rounded bg-gray-700 px-3 py-2">Aplicar a todos los grupos</button>
             </div>
+            </details>
             {% for grupo in preparacion.grupos_bilaterales %}
             <div class="space-y-2 border-t border-gray-700 py-3" data-grupo-bilateral="{{ grupo.id }}" data-miembros="{{ grupo.filas_ids|join:',' }}">
                 <p class="font-semibold">{{ grupo.paciente }} · {{ grupo.documento }} · {{ grupo.fecha|date:'d/m/Y' }} · {% if grupo.tipo == 'VENOSO_MMII' %}Venoso{% else %}Arterial{% endif %}</p>
-                {% for fila in grupo.filas %}<p class="text-sm">Pedido {{ fila.pedido }} · {{ fila.practica }} · {{ fila.hora }}</p>{% endfor %}
+                {% for fila in grupo.filas %}<div class="consol-source-row"><span class="consol-source consol-source-netterm">Netterm</span> <strong>Pedido {{ fila.pedido }}</strong> · {{ fila.practica }}{% include 'eges_import/includes/detalle_evidencia.html' with detalle=fila.detalle %}</div>{% endfor %}
                 <label>Conteo del grupo <select data-decision-bilateral class="rounded bg-gray-800 p-2"><option value="">Pendiente de revisión</option><option value="UNICO" {% if grupo.accion_seleccionada == 'UNICO' %}selected{% endif %}>Representan un único estudio</option><option value="INDEPENDIENTES" {% if grupo.accion_seleccionada == 'INDEPENDIENTES' %}selected{% endif %}>Son estudios independientes</option></select></label>
+                <span data-estado-guardado class="inline-block rounded border px-2 py-1 text-sm" role="status"></span>
             </div>
             {% endfor %}
         </section>
@@ -94,254 +157,53 @@
         <section data-paso-revision="procedimientos" class="space-y-3 rounded border border-teal-600 p-4">
             <h2 class="text-lg font-semibold">Revisar procedimientos guiados</h2>
             <p>Estos pedidos contienen una práctica guiada por ecografía o tomografía y registros de biopsia o citología. Al confirmar un procedimiento, se conserva una práctica principal de su modalidad y las filas complementarias quedan fuera del conteo en ambas fuentes.</p>
+            <details class="consol-bulk"><summary>Aplicar una decisión a todos estos pedidos</summary>
+            <p>Aplicá en conjunto únicamente lo que ya comprobaste.</p>
             <div class="flex flex-wrap items-center gap-3">
                 <label for="accion-procedimiento-conjunto">Acción para estos pedidos</label>
                 <select id="accion-procedimiento-conjunto" class="rounded bg-gray-800 p-2"><option value="">Elegir</option><option value="UNICO">Un procedimiento guiado por pedido</option><option value="INDEPENDIENTES">Revisar como prácticas independientes</option></select>
                 <button type="button" id="aplicar-procedimiento-conjunto" class="rounded bg-gray-700 px-3 py-2">Aplicar a todos estos pedidos</button>
             </div>
+            </details>
             {% for grupo in preparacion.grupos_procedimientos %}
             <div class="space-y-2 border-t border-gray-700 py-3" data-grupo-procedimiento="{{ grupo.id }}" data-miembros="{{ grupo.filas_ids|join:',' }}" data-componentes="{{ grupo.componentes_ids|join:',' }}">
                 <p class="font-semibold">{{ grupo.paciente }} · {{ grupo.documento }} · {{ grupo.fecha|date:'d/m/Y' }} · {{ grupo.modalidad_nombre }} · Pedido {{ grupo.pedido }}</p>
-                {% for fila in grupo.filas %}<p class="text-sm">{{ fila.practica }} · {{ fila.estado }}</p>{% endfor %}
+                {% for fila in grupo.filas %}<div class="consol-source-row"><span class="consol-source consol-source-netterm">Netterm</span> {{ fila.practica }} · {{ fila.estado }}<details class="consol-evidence-details"><summary>Fechas, informante y sector</summary>{% include 'eges_import/includes/detalle_evidencia.html' with detalle=fila.detalle %}</details></div>{% endfor %}
                 <label>Conteo del pedido <select data-decision-bilateral class="rounded bg-gray-800 p-2"><option value="">Pendiente de revisión</option><option value="UNICO" {% if grupo.accion_seleccionada == 'UNICO' %}selected{% endif %}>Un procedimiento guiado y sus componentes</option><option value="INDEPENDIENTES" {% if grupo.accion_seleccionada == 'INDEPENDIENTES' %}selected{% endif %}>Conservar decisiones por práctica</option></select></label>
+                <span data-estado-guardado class="inline-block rounded border px-2 py-1 text-sm" role="status"></span>
             </div>
             {% endfor %}
         </section>
         {% endif %}
         <section data-paso-revision="resumen" class="space-y-3 rounded border border-gray-600 p-4">
             <h2 class="text-lg font-semibold">Resumen de la producción a confirmar</h2>
+            <p>Este resultado incorpora tus decisiones. Guardar la revisión conserva el avance; confirmar publica esta selección en el tablero.</p>
             <p id="resumen-produccion" role="status" aria-live="polite">Completá la revisión para calcular el total.</p>
+            <div id="tarjetas-resumen" class="consol-result" hidden>
+                <div><small>Prácticas respaldadas</small><strong id="resumen-total">—</strong></div>
+                <div><small>Aporte EGES</small><strong id="resumen-eges">—</strong></div>
+                <div><small>Aporte Netterm</small><strong id="resumen-netterm">—</strong></div>
+                <div><small>Pacientes identificables</small><strong id="resumen-pacientes">—</strong></div>
+            </div>
             <button type="button" id="recalcular-resumen" class="rounded border border-gray-500 px-3 py-2">Recalcular resumen</button>
-            <p>Al confirmar se guardan las decisiones y se actualizan el dashboard y el PDF con este resultado.</p>
+            <p>Al confirmar se guardan las decisiones y se actualizan el dashboard y el PDF con este resultado. No modifica pagos de Liquidación.</p>
+            <button type="submit" class="rounded bg-teal-700 px-5 py-3 font-semibold">Confirmar producción y actualizar gráficos</button>
         </section>
-        <p id="estado-revision" role="status" aria-live="polite"></p>
-        <button type="button" id="ir-primera-pendiente" class="rounded border border-amber-500 px-3 py-2">Ir al primer campo pendiente</button>
-        <button type="button" id="etapa-anterior" class="rounded border border-gray-500 px-4 py-2">Anterior</button>
-        <button type="button" id="etapa-siguiente" class="rounded bg-teal-700 px-4 py-2">Continuar</button>
-        <button type="submit" class="rounded bg-teal-700 px-5 py-3 font-semibold">Confirmar producción y actualizar gráficos</button>
+        <div class="consol-navigation">
+            <p id="estado-revision" role="status" aria-live="polite"></p>
+            <button type="button" id="ir-primera-pendiente" class="rounded border border-amber-500 px-3 py-2">Ir al primer campo pendiente</button>
+            <button type="button" id="etapa-anterior" class="rounded border border-gray-500 px-4 py-2">Anterior</button>
+            <button type="button" id="etapa-siguiente" class="rounded bg-teal-700 px-4 py-2">Continuar</button>
+        </div>
+        <div class="consol-savebar">
+            <div class="consol-save-reason"><label for="motivo-revision">Motivo de estas decisiones</label><textarea id="motivo-revision" name="motivo_revision" maxlength="2000" rows="2" placeholder="Ej.: contrastado en Visual; una práctica con pedidos reiterados" aria-describedby="estado-guardado"></textarea></div>
+            <div class="consol-save-action"><button type="button" id="guardar-revision" class="rounded bg-blue-700 px-4 py-2">Guardar revisión y continuar después</button><p id="estado-guardado" role="status" aria-live="polite">Guardar conserva el avance. Los gráficos cambian al confirmar la producción.</p></div>
+        </div>
+        <noscript><p>Activá JavaScript para revisar, guardar el avance y calcular el resumen.</p></noscript>
     </form>
     {% endif %}
 </div>
-<script>
-const confirmacion = document.getElementById('confirmar-produccion');
-if (confirmacion) {
-    const filas = Array.from(confirmacion.querySelectorAll('[data-excepcion]'));
-    const grupos = Array.from(confirmacion.querySelectorAll('[data-grupo-bilateral], [data-grupo-procedimiento]'));
-    const estado = document.getElementById('estado-revision');
-    const irPendiente = document.getElementById('ir-primera-pendiente');
-    const decisionesAntesDelGrupo = new Map();
-    const secciones = Array.from(confirmacion.querySelectorAll('[data-paso-revision]'));
-    const ordenEtapas = ['doppler', 'procedimientos', 'excepciones', 'resumen'];
-    const botonesEtapa = Array.from(confirmacion.querySelectorAll('[data-ir-etapa]'));
-    let etapaActual = ordenEtapas.find(etapa => secciones.some(seccion => seccion.dataset.pasoRevision === etapa));
-    let versionRevision = 0;
-    let resumenListo = false;
-    let peticionResumen = null;
-    let primerPendiente = null;
-    function etapaResuelta(etapa) {
-        if (etapa === 'excepciones') return filas.filter(fila => !fila.hidden).every(fila => {
-            const accion = fila.querySelector('[data-accion]').value;
-            return accion && (accion === 'EXCLUIR' || fila.querySelector('[data-modalidad]').value);
-        });
-        if (etapa === 'doppler' || etapa === 'procedimientos') return grupos.filter(grupo =>
-            etapa === 'doppler' ? grupo.dataset.grupoBilateral : grupo.dataset.grupoProcedimiento
-        ).every(grupo => grupo.querySelector('[data-decision-bilateral]').value);
-        return true;
-    }
-    function etapasDisponibles() {
-        return ordenEtapas.filter(etapa => secciones.some(seccion => seccion.dataset.pasoRevision === etapa) &&
-            (etapa !== 'excepciones' || filas.some(fila => !fila.hidden)));
-    }
-    function actualizarNavegacion() {
-        const etapas = etapasDisponibles();
-        botonesEtapa.forEach(boton => {
-            const etapa = boton.dataset.irEtapa;
-            const posicion = etapas.indexOf(etapa);
-            boton.hidden = posicion < 0;
-            boton.disabled = posicion >= 0 && !etapas.slice(0, posicion).every(etapaResuelta);
-            boton.setAttribute('aria-current', etapa === etapaActual ? 'step' : 'false');
-        });
-        document.getElementById('etapa-anterior').hidden = etapas.indexOf(etapaActual) <= 0;
-        const siguiente = document.getElementById('etapa-siguiente');
-        siguiente.hidden = etapaActual === 'resumen';
-        siguiente.disabled = !etapaResuelta(etapaActual);
-        const confirmar = confirmacion.querySelector('button[type="submit"]');
-        confirmar.hidden = etapaActual !== 'resumen';
-        confirmar.disabled = !resumenListo || !etapas.every(etapaResuelta);
-    }
-    function mostrarEtapa(etapa) {
-        etapaActual = etapa;
-        secciones.forEach(seccion => seccion.hidden = seccion.dataset.pasoRevision !== etapa);
-        actualizarNavegacion();
-        if (etapa === 'resumen') calcularResumen();
-    }
-    function actualizarRevision(conservarResumen = false) {
-        if (!conservarResumen) { versionRevision += 1; resumenListo = false; }
-        let acciones = 0;
-        let modalidades = 0;
-        let bilaterales = 0;
-        primerPendiente = null;
-        filas.forEach(fila => {
-            if (fila.hidden) return;
-            const accion = fila.querySelector('[data-accion]');
-            const modalidad = fila.querySelector('[data-modalidad]');
-            const faltaAccion = !accion.value;
-            const faltaModalidad = !!accion.value && accion.value !== 'EXCLUIR' && !modalidad.value;
-            accion.setAttribute('aria-invalid', String(faltaAccion));
-            modalidad.setAttribute('aria-invalid', String(faltaModalidad));
-            if (faltaAccion) { acciones += 1; primerPendiente = primerPendiente || accion; }
-            if (faltaModalidad) { modalidades += 1; primerPendiente = primerPendiente || modalidad; }
-        });
-        let primerGrupoPendiente = null;
-        grupos.forEach(grupo => {
-            const decision = grupo.querySelector('[data-decision-bilateral]');
-            decision.setAttribute('aria-invalid', String(!decision.value));
-            if (!decision.value) { bilaterales += 1; primerGrupoPendiente = primerGrupoPendiente || decision; }
-        });
-        primerPendiente = primerGrupoPendiente || primerPendiente;
-        const faltantes = [];
-        if (acciones) faltantes.push(`${acciones} decisiones de excepción`);
-        if (modalidades) faltantes.push(`${modalidades} modalidades de práctica`);
-        if (bilaterales) faltantes.push(`${bilaterales} decisiones de grupos clínicos`);
-        estado.textContent = faltantes.length ? `Para confirmar faltan ${faltantes.join(', ')}.` : 'Todas las excepciones están resueltas. Podés confirmar la producción.';
-        irPendiente.hidden = faltantes.length === 0;
-        const totalVisibles = document.getElementById('total-excepciones-visibles');
-        const resueltasPorGrupo = document.getElementById('resueltas-por-grupo');
-        if (totalVisibles) totalVisibles.textContent = filas.filter(fila => !fila.hidden).length;
-        if (resueltasPorGrupo) {
-            const resueltas = filas.filter(fila => fila.hidden).length;
-            resueltasPorGrupo.hidden = resueltas === 0;
-            resueltasPorGrupo.textContent = `${resueltas} componentes resueltos por procedimiento.`;
-        }
-        actualizarNavegacion();
-    }
-    irPendiente.addEventListener('click', () => {
-        if (primerPendiente) {
-            const seccion = primerPendiente.closest('[data-paso-revision]');
-            if (seccion) mostrarEtapa(seccion.dataset.pasoRevision);
-            primerPendiente.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            primerPendiente.focus({ preventScroll: true });
-        }
-    });
-    confirmacion.addEventListener('change', () => actualizarRevision());
-    function resolverGrupo(grupo) {
-        const accionGrupo = grupo.querySelector('[data-decision-bilateral]').value;
-        grupo.dataset.miembros.split(',').forEach(id => {
-            const fila = filas.find(item => item.dataset.excepcion === id);
-            if (!fila) return;
-            const select = fila.querySelector('[data-accion]');
-            const candidatas = Array.from(select.options).filter(opcion => opcion.value.startsWith('VINCULAR:'));
-            const esComponente = (grupo.dataset.componentes || '').split(',').includes(id);
-            if (esComponente && accionGrupo === 'UNICO' && candidatas.length <= 1) {
-                if (!decisionesAntesDelGrupo.has(id)) decisionesAntesDelGrupo.set(id, {
-                    accion: select.value, modalidad: fila.querySelector('[data-modalidad]').value,
-                });
-                select.value = 'EXCLUIR';
-                fila.hidden = true;
-                fila.querySelector('[data-seleccionar]').checked = false;
-            } else {
-                if (esComponente && decisionesAntesDelGrupo.has(id)) {
-                    const anterior = decisionesAntesDelGrupo.get(id);
-                    select.value = anterior.accion;
-                    fila.querySelector('[data-modalidad]').value = anterior.modalidad;
-                    decisionesAntesDelGrupo.delete(id);
-                    fila.hidden = false;
-                }
-                if (accionGrupo && !esComponente && !select.value && !candidatas.length && fila.querySelector('[data-modalidad]').value) select.value = 'ADICIONAL';
-            }
-        });
-        actualizarRevision();
-    }
-    grupos.forEach(grupo => grupo.querySelector('[data-decision-bilateral]').addEventListener('change', () => resolverGrupo(grupo)));
-    const aplicarGrupos = document.getElementById('aplicar-bilateral-conjunto');
-    if (aplicarGrupos) aplicarGrupos.addEventListener('click', () => {
-        const accion = document.getElementById('accion-bilateral-conjunto').value;
-        if (accion) grupos.filter(grupo => grupo.dataset.grupoBilateral).forEach(grupo => {
-            grupo.querySelector('[data-decision-bilateral]').value = accion;
-            resolverGrupo(grupo);
-        });
-    });
-    const aplicarProcedimientos = document.getElementById('aplicar-procedimiento-conjunto');
-    if (aplicarProcedimientos) aplicarProcedimientos.addEventListener('click', () => {
-        const accion = document.getElementById('accion-procedimiento-conjunto').value;
-        if (accion) grupos.filter(grupo => grupo.dataset.grupoProcedimiento).forEach(grupo => {
-            grupo.querySelector('[data-decision-bilateral]').value = accion;
-            resolverGrupo(grupo);
-        });
-    });
-    const todas = document.getElementById('seleccionar-excepciones');
-    if (todas) {
-        todas.addEventListener('change', () => filas.forEach(fila => fila.querySelector('[data-seleccionar]').checked = !fila.hidden && todas.checked));
-        document.getElementById('aplicar-conjunto').addEventListener('click', () => {
-            const accion = document.getElementById('accion-conjunto').value;
-            filas.filter(fila => !fila.hidden && fila.querySelector('[data-seleccionar]').checked).forEach(fila => {
-                const select = fila.querySelector('[data-accion]');
-                if (accion === 'VINCULAR_UNICA') {
-                    const candidatas = Array.from(select.options).filter(opcion => opcion.value.startsWith('VINCULAR:'));
-                    if (candidatas.length === 1) select.value = candidatas[0].value;
-                } else if (accion) select.value = accion;
-            });
-            actualizarRevision();
-        });
-    }
-    function serializarDecisiones() {
-        const decisiones = {};
-        filas.forEach(fila => decisiones[fila.dataset.excepcion] = {
-            accion: fila.querySelector('[data-accion]').value,
-            modalidad: fila.querySelector('[data-modalidad]').value,
-        });
-        grupos.forEach(grupo => decisiones[grupo.dataset.grupoBilateral || grupo.dataset.grupoProcedimiento] = {
-            accion: grupo.querySelector('[data-decision-bilateral]').value,
-        });
-        document.getElementById('decisiones-produccion').value = JSON.stringify(decisiones);
-    }
-    async function calcularResumen() {
-        if (!etapasDisponibles().every(etapaResuelta)) return;
-        if (peticionResumen) peticionResumen.abort();
-        peticionResumen = new AbortController();
-        const versionSolicitada = versionRevision;
-        const texto = document.getElementById('resumen-produccion');
-        texto.textContent = 'Calculando la producción con tus decisiones…';
-        resumenListo = false;
-        actualizarNavegacion();
-        serializarDecisiones();
-        const datos = new FormData(confirmacion);
-        datos.set('accion', 'resumen');
-        try {
-            const respuesta = await fetch(window.location.href, {
-                method: 'POST', body: datos, signal: peticionResumen.signal,
-            });
-            const resultado = await respuesta.json();
-            if (versionSolicitada !== versionRevision) return;
-            if (!respuesta.ok) throw new Error(resultado.error || 'Revisá las decisiones para calcular el resumen.');
-            const numero = valor => Number(valor).toLocaleString('es-AR');
-            texto.textContent = `${numero(resultado.total_produccion)} prácticas únicas. EGES ${numero(resultado.base_eges)} + aporte Netterm ${numero(resultado.aporte_netterm)}. Pacientes identificables ${numero(resultado.pacientes_unicos_identificables)}.`;
-            resumenListo = true;
-            actualizarRevision(true);
-        } catch (error) {
-            if (error.name !== 'AbortError' && versionSolicitada === versionRevision) {
-                texto.textContent = error.message || 'No se pudo calcular el resumen. Volvé a intentarlo.';
-                resumenListo = false;
-                actualizarNavegacion();
-            }
-        }
-    }
-    botonesEtapa.forEach(boton => boton.addEventListener('click', () => mostrarEtapa(boton.dataset.irEtapa)));
-    document.getElementById('etapa-anterior').addEventListener('click', () => {
-        const etapas = etapasDisponibles();
-        mostrarEtapa(etapas[etapas.indexOf(etapaActual) - 1]);
-    });
-    document.getElementById('etapa-siguiente').addEventListener('click', () => {
-        const etapas = etapasDisponibles();
-        mostrarEtapa(etapas[etapas.indexOf(etapaActual) + 1]);
-    });
-    document.getElementById('recalcular-resumen').addEventListener('click', calcularResumen);
-    confirmacion.addEventListener('submit', serializarDecisiones);
-    grupos.forEach(grupo => {
-        if (grupo.querySelector('[data-decision-bilateral]').value) resolverGrupo(grupo);
-    });
-    actualizarRevision();
-    mostrarEtapa(etapaActual);
-}
-</script>
+
 {% endblock %}
+
+{% block extra_js %}<script src="{% static 'js/eges_consolidacion.js' %}?v=20261127-3" defer></script>{% endblock %}
